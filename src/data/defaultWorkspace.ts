@@ -1,0 +1,83 @@
+import type { Workspace } from '../types';
+
+const now = Date.now();
+
+export const defaultWorkspace: Workspace = {
+  version: 4,
+  activeNoteId: 'welcome-note',
+  folders: [
+    { id: 'inbox', name: 'Inbox', color: '#4c9bff' },
+    { id: 'personal', name: 'Personal', color: '#8f65e9' },
+    { id: 'ideas', name: 'Ideas', color: '#f19b3f' },
+  ],
+  tags: [
+    { id: 'thinking', name: 'thinking', color: '#8f65e9' },
+    { id: 'sketch', name: 'sketch', color: '#f19b3f' },
+  ],
+  notes: [
+    {
+      id: 'welcome-note',
+      title: 'Study notes',
+      mode: 'document',
+      folderId: 'inbox',
+      tagIds: ['thinking', 'sketch'],
+      favorite: true,
+      updatedAt: now,
+      createdAt: now,
+      openedAt: now,
+      openCount: 1,
+      captureKind: 'standard',
+      camera: { x: 0, y: 0, zoom: 1 },
+      canvasColor: '#000000',
+      canvasPattern: 'plain',
+      objects: [],
+      pages: [
+        {
+          id: 'welcome-page',
+          html: '<h1>Study notes</h1><p>Type naturally, then switch to the pen whenever an idea is easier to draw.</p><h2>Before class</h2><ul data-type="taskList"><li data-type="taskItem" data-checked="true"><label><input type="checkbox" checked><span></span></label><div><p>Review the last lecture</p></div></li><li data-type="taskItem" data-checked="false"><label><input type="checkbox"><span></span></label><div><p>Write down three questions</p></div></li></ul><h2>Key idea</h2><p>Your typed notes and handwriting share the same page. Nothing needs to be moved into a separate diagram mode.</p>',
+          objects: [],
+        },
+      ],
+    },
+    {
+      id: 'pen-test-note',
+      title: 'Pen test',
+      mode: 'canvas',
+      folderId: 'ideas',
+      tagIds: ['sketch'],
+      favorite: false,
+      updatedAt: now - 86_400_000,
+      createdAt: now - 86_400_000,
+      openedAt: now - 86_400_000,
+      openCount: 0,
+      captureKind: 'drawing',
+      camera: { x: 0, y: 0, zoom: 1 },
+      canvasColor: '#000000',
+      canvasPattern: 'plain',
+      objects: [],
+      pages: [],
+    },
+  ],
+  settings: {
+    theme: 'dark',
+    penColor: '#4c9bff',
+    pressureWidth: true,
+    conversionMode: 'manual',
+    conversionDelayMs: 2500,
+    handwritingFont: 'chalkboard',
+    shortcuts: {
+      pen: 'b',
+      eraser: 'e',
+      select: 'v',
+      text: 't',
+      handwriting: 'h',
+    },
+    profileName: '',
+    defaultTemplate: 'blank',
+    defaultQuickCapture: 'thought',
+    utilityPanelVisible: true,
+    focusMessage: '',
+    transcriptionEnabled: true,
+  },
+  focusByDate: {},
+};

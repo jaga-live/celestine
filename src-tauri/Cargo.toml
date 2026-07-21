@@ -1,0 +1,23 @@
+[package]
+name = "celestine"
+version = "0.1.0"
+description = "A local-first canvas for ink, text and diagrams"
+authors = ["Celestine contributors"]
+edition = "2021"
+
+[lib]
+name = "celestine_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [] }
+base64 = "0.22"
+rand = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+sha2 = "0.10"
+url = "2.5"
