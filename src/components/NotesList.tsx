@@ -494,7 +494,7 @@ export function NotesList({
               <button onClick={() => onSearchChange('')}>Clear search</button>
             </div>
           ) : (
-            <div className="empty-notes-space">
+            <div className="empty-notes-space centered">
               <div className="empty-space-art-circle" aria-hidden="true">
                 <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
                   <circle
@@ -529,58 +529,10 @@ export function NotesList({
                   <circle cx="36" cy="72" r="1.5" fill="#f97316" />
                 </svg>
               </div>
-              <h2>Map out what’s next</h2>
+              <h2>Map out what's next</h2>
               <p className="empty-space-desc">
                 {title} is empty. Capture ideas, plans, and milestones to keep your vision on track.
               </p>
-
-              <div className="empty-space-section">
-                <p className="section-mini-label">QUICK START</p>
-                <div className="empty-space-actions">
-                  <button onClick={() => onCreateNote('document')}>
-                    <FileText size={22} className="icon-purple" />
-                    <strong>Blank note</strong>
-                    <small>Start writing</small>
-                  </button>
-                  <button onClick={() => onCreateNote('canvas')}>
-                    <PenLine size={22} className="icon-blue" />
-                    <strong>Drawing</strong>
-                    <small>Sketch your ideas</small>
-                  </button>
-                  <button onClick={() => onOpenAudio?.()}>
-                    <Mic size={22} className="icon-orange" />
-                    <strong>Audio note</strong>
-                    <small>Record a thought</small>
-                  </button>
-                </div>
-              </div>
-
-              <div className="empty-space-section">
-                <p className="section-mini-label">NOTES</p>
-                <div className="skeleton-cards">
-                  <div className="skeleton-card">
-                    <div className="skeleton-icon-box" />
-                    <div className="skeleton-lines">
-                      <span className="line-long" />
-                      <span className="line-short" />
-                    </div>
-                  </div>
-                  <div className="skeleton-card">
-                    <div className="skeleton-icon-box" />
-                    <div className="skeleton-lines">
-                      <span className="line-long" />
-                      <span className="line-short" />
-                    </div>
-                  </div>
-                  <div className="skeleton-card">
-                    <div className="skeleton-icon-box" />
-                    <div className="skeleton-lines">
-                      <span className="line-long" />
-                      <span className="line-short" />
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           )
         ) : null}

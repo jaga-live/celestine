@@ -353,7 +353,7 @@ export default function App() {
 
   const createNote = (
     mode: NoteMode = 'document',
-    template: CelestineTemplate = mode === 'canvas' ? 'blank' : 'study',
+    template: CelestineTemplate = 'blank',
     quickCapture = false,
   ) => {
     const folderId = filter.type === 'folder' ? filter.id : 'inbox';
