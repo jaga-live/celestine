@@ -23,10 +23,12 @@ export interface InkStroke {
   createdAt: number;
 }
 
+export type ShapeType = 'rectangle' | 'ellipse' | 'diamond' | 'arrow' | 'line' | 'triangle';
+
 export interface ShapeObject {
   id: string;
   type: 'shape';
-  shape: 'rectangle' | 'ellipse' | 'diamond' | 'arrow';
+  shape: ShapeType;
   x: number;
   y: number;
   width: number;
@@ -141,6 +143,8 @@ export interface Settings {
   microphoneId?: string;
   transcriptionEnabled?: boolean;
   globalShortcuts?: Record<string, string>;
+  confirmQuit?: 'ask' | 'never';
+  selectedShape?: ShapeType;
 }
 
 export interface FocusItem {

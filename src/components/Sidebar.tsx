@@ -91,29 +91,12 @@ export function Sidebar({
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('#ff70a6');
   const [editSecondary, setEditSecondary] = useState('#ff9770');
-
-  const handleTitleBarDoubleClick = (event: React.MouseEvent<HTMLElement>) => {
-    if ((event.target as HTMLElement).closest('button, input, select, a')) return;
-    if ('__TAURI_INTERNALS__' in window || '__TAURI__' in window)
-      void getCurrentWindow().toggleMaximize();
-  };
-
-  useEffect(() => {
-    if (!menu) return;
-    const closeMenu = (event: PointerEvent) => {
-      const target = event.target as Element;
-      if (target.closest('.sidebar-context-menu, .sidebar-more')) return;
-      setMenu(null);
-    };
-    window.addEventListener('pointerdown', closeMenu);
-    return () => window.removeEventListener('pointerdown', closeMenu);
-  }, [menu]);
-
   const toggleMenu = (type: 'folder' | 'tag', id: string, anchor: HTMLElement) => {
     const rect = anchor.getBoundingClientRect();
-    setMenuPlacement(rect.bottom + 180 > window.innerHeight ? 'up' : 'down');
-    setMenu(menu?.id === id ? null : { type, id });
+    setMenuPlacement(rect.bottom + 190 > window.innerHeight ? 'up' : 'down');
+    setMenu((prev) => (prev?.id === id ? null : { type, id }));
   };
+
   const libraryItems = [
     { label: 'Notes', icon: BookOpen, color: '#4c9bff', value: { type: 'all' } as LibraryFilter },
     {
@@ -133,16 +116,31 @@ export function Sidebar({
 
   return (
     <aside className={collapsed ? 'sidebar app-panel collapsed' : 'sidebar app-panel'}>
-      <div className="brand-row" data-tauri-drag-region onDoubleClick={handleTitleBarDoubleClick}>
+      {menu ? (
+        <div
+          className="sidebar-menu-overlay"
+          onClick={(event) => {
+            event.stopPropagation();
+            event.preventDefault();
+            setMenu(null);
+          }}
+          onPointerDown={(event) => {
+            event.stopPropagation();
+            event.preventDefault();
+            setMenu(null);
+          }}
+        />
+      ) : null}
+      <div className="brand-row" data-tauri-drag-region>
         <img
           className="celestine-logo"
           src="/celestine-mark.svg"
           alt=""
-          onDoubleClick={handleTitleBarDoubleClick}
+          data-tauri-drag-region
         />
-        <div className="brand-copy" onDoubleClick={handleTitleBarDoubleClick}>
-          <strong>Celestine</strong>
-          <span>your universe of ideas ✦</span>
+        <div className="brand-copy" data-tauri-drag-region>
+          <strong data-tauri-drag-region>Celestine</strong>
+          <span data-tauri-drag-region>your universe of ideas ✦</span>
         </div>
         <button
           className="sidebar-collapse"
@@ -207,187 +205,30 @@ export function Sidebar({
         {folders
           .filter((folder) => folder.id !== 'inbox' && !folder.parentId)
           .map((folder) => {
-            const value = { type: 'folder', id: folder.id } as LibraryFilter;
             const childFolders = folders.filter((child) => child.parentId === folder.id);
-            const isMenuOpen = menu?.type === 'folder' && menu.id === folder.id;
 
             return (
-              <div key={folder.id} className="project-group">
-                <div className={isMenuOpen ? 'sidebar-row has-menu-open' : 'sidebar-row'}>
-                  <button
-                    className={filterMatches(filter, value) ? 'nav-item active' : 'nav-item'}
-                    onClick={() => onFilterChange(value)}
-                    title={folder.name}
-                    aria-label={folder.name}
-                    style={{ '--item-color': folder.color } as React.CSSProperties}
-                  >
-                    {folder.icon ? (
-                      <span aria-hidden="true">{folder.icon}</span>
-                    ) : (
-                      <LiquidOrb
-                        primaryColor={folder.color || '#3b82f6'}
-                        secondaryColor={folder.secondaryColor}
-                        size={18}
-                      />
-                    )}
-                    <span>{folder.name}</span>
-                    {childFolders.length > 0 ? (
-                      <ChevronDown size={14} className="project-chevron" />
-                    ) : (
-                      <ChevronRight size={14} className="project-chevron" />
-                    )}
-                  </button>
-                  <button
-                    className={isMenuOpen ? 'sidebar-more active' : 'sidebar-more'}
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onMouseDown={(event) => event.stopPropagation()}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      toggleMenu('folder', folder.id, event.currentTarget);
-                    }}
-                    aria-label={`Actions for ${folder.name}`}
-                    title="Project options"
-                  >
-                    <MoreHorizontal size={15} />
-                  </button>
-                  {isMenuOpen ? (
-                    <div
-                      className={`sidebar-context-menu ${menuPlacement === 'up' ? 'open-up' : ''}`}
-                      onPointerDown={(event) => event.stopPropagation()}
-                      onMouseDown={(event) => event.stopPropagation()}
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      <button
-                        onClick={() => {
-                          onCreateProjectFolder(folder.id);
-                          setMenu(null);
-                        }}
-                      >
-                        New folder
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditingFolder(folder);
-                          setEditName(folder.name);
-                          setEditColor(folder.color);
-                          setEditSecondary(
-                            folder.secondaryColor || getSecondaryColor(folder.color),
-                          );
-                          setMenu(null);
-                        }}
-                      >
-                        Edit project
-                      </button>
-                      <button
-                        onClick={() => {
-                          onChangeFolderIcon(folder.id);
-                          setMenu(null);
-                        }}
-                      >
-                        Change icon
-                      </button>
-                      <button
-                        onClick={() => {
-                          onDuplicateFolder(folder.id);
-                          setMenu(null);
-                        }}
-                      >
-                        Duplicate
-                      </button>
-                      <button
-                        className="danger"
-                        onClick={() => {
-                          onDeleteFolder(folder.id);
-                          setMenu(null);
-                        }}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-                {!collapsed && childFolders.length > 0 && (
-                  <div className="child-folders-tree">
-                    {childFolders.map((child) => {
-                      const isChildActive = filterMatches(filter, { type: 'folder', id: child.id });
-                      const isChildMenuOpen = menu?.type === 'folder' && menu.id === child.id;
-
-                      return (
-                        <div
-                          className={isChildMenuOpen ? 'sidebar-row has-menu-open' : 'sidebar-row'}
-                          key={child.id}
-                        >
-                          <button
-                            className={
-                              isChildActive
-                                ? 'nav-item child-folder active'
-                                : 'nav-item child-folder'
-                            }
-                            onClick={() => {
-                              onFilterChange({ type: 'folder', id: child.id });
-                              onViewChange('notes');
-                            }}
-                            title={child.name}
-                          >
-                            <span
-                              className="child-folder-dot"
-                              style={{ background: child.color || '#f97316' }}
-                            />
-                            <span>{child.name}</span>
-                          </button>
-                          <button
-                            className={isChildMenuOpen ? 'sidebar-more active' : 'sidebar-more'}
-                            onPointerDown={(event) => event.stopPropagation()}
-                            onMouseDown={(event) => event.stopPropagation()}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              toggleMenu('folder', child.id, event.currentTarget);
-                            }}
-                            aria-label={`Actions for ${child.name}`}
-                            title="Space options"
-                          >
-                            <MoreHorizontal size={14} />
-                          </button>
-                          {isChildMenuOpen ? (
-                            <div
-                              className={`sidebar-context-menu ${menuPlacement === 'up' ? 'open-up' : ''}`}
-                              onPointerDown={(event) => event.stopPropagation()}
-                              onMouseDown={(event) => event.stopPropagation()}
-                              onClick={(event) => event.stopPropagation()}
-                            >
-                              <button
-                                onClick={() => {
-                                  onRenameFolder(child.id);
-                                  setMenu(null);
-                                }}
-                              >
-                                Rename space
-                              </button>
-                              <button
-                                onClick={() => {
-                                  onRecolorFolder(child.id);
-                                  setMenu(null);
-                                }}
-                              >
-                                Change color
-                              </button>
-                              <button
-                                className="danger"
-                                onClick={() => {
-                                  onDeleteFolder(child.id);
-                                  setMenu(null);
-                                }}
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          ) : null}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <ProjectItemRow
+                key={folder.id}
+                folder={folder}
+                childFolders={childFolders}
+                filter={filter}
+                onFilterChange={onFilterChange}
+                onCreateProjectFolder={onCreateProjectFolder}
+                onEditFolder={(f) => {
+                  setEditingFolder(f);
+                  setEditName(f.name);
+                  setEditColor(f.color);
+                  setEditSecondary(f.secondaryColor || getSecondaryColor(f.color));
+                }}
+                onChangeFolderIcon={onChangeFolderIcon}
+                onDuplicateFolder={onDuplicateFolder}
+                onDeleteFolder={onDeleteFolder}
+                collapsed={collapsed}
+                onViewChange={onViewChange}
+                onRenameFolder={onRenameFolder}
+                onRecolorFolder={onRecolorFolder}
+              />
             );
           })}
 
@@ -468,16 +309,18 @@ export function Sidebar({
         </div>
       </nav>
 
-      <button
-        className="nav-item settings-link"
-        onClick={onOpenSettings}
-        title="Settings"
-        aria-label="Settings"
-      >
-        <Settings size={16} strokeWidth={1.8} />
-        <span>Settings</span>
-        <ChevronRight size={14} className="settings-chevron" />
-      </button>
+      <div className="sidebar-footer">
+        <button
+          className="nav-item settings-link"
+          onClick={onOpenSettings}
+          title="Settings"
+          aria-label="Settings"
+        >
+          <Settings size={16} strokeWidth={1.8} />
+          <span>Settings</span>
+          <ChevronRight size={14} className="settings-chevron" />
+        </button>
+      </div>
 
       {editingFolder && (
         <div className="overlay-backdrop" onClick={() => setEditingFolder(null)}>
@@ -575,5 +418,306 @@ export function Sidebar({
         </div>
       )}
     </aside>
+  );
+}
+
+function ProjectItemRow({
+  folder,
+  childFolders,
+  filter,
+  onFilterChange,
+  onCreateProjectFolder,
+  onEditFolder,
+  onChangeFolderIcon,
+  onDuplicateFolder,
+  onDeleteFolder,
+  collapsed,
+  onViewChange,
+  onRenameFolder,
+  onRecolorFolder,
+}: {
+  folder: FolderType;
+  childFolders: FolderType[];
+  filter: LibraryFilter;
+  onFilterChange: (filter: LibraryFilter) => void;
+  onCreateProjectFolder: (id: string) => void;
+  onEditFolder: (folder: FolderType) => void;
+  onChangeFolderIcon: (id: string) => void;
+  onDuplicateFolder: (id: string) => void;
+  onDeleteFolder: (id: string) => void;
+  collapsed: boolean;
+  onViewChange: (view: 'home' | 'notes' | 'templates') => void;
+  onRenameFolder: (id: string) => void;
+  onRecolorFolder: (id: string) => void;
+}) {
+  const [menuCoords, setMenuCoords] = useState<{ top: number; right: number } | null>(null);
+  const value = { type: 'folder', id: folder.id } as LibraryFilter;
+  const isActive = filterMatches(filter, value);
+
+  useEffect(() => {
+    if (!menuCoords) return;
+
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as Element;
+      if (target.closest('.sidebar-context-menu, .sidebar-more')) return;
+      setMenuCoords(null);
+    };
+
+    const animFrame = requestAnimationFrame(() => {
+      window.addEventListener('click', handleOutsideClick);
+    });
+
+    return () => {
+      cancelAnimationFrame(animFrame);
+      window.removeEventListener('click', handleOutsideClick);
+    };
+  }, [menuCoords]);
+
+  const handleToggle = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    if (menuCoords) {
+      setMenuCoords(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const openUp = rect.bottom + 190 > window.innerHeight;
+    setMenuCoords({
+      top: openUp ? rect.top - 180 : rect.bottom + 4,
+      right: Math.max(12, window.innerWidth - rect.right),
+    });
+  };
+
+  return (
+    <div className="project-group">
+      <div className={isActive ? 'sidebar-row active' : menuCoords ? 'sidebar-row has-menu-open' : 'sidebar-row'}>
+        <button
+          className="sidebar-row-click-target"
+          onClick={() => onFilterChange(value)}
+          title={folder.name}
+          aria-label={folder.name}
+          style={{ '--item-color': folder.color } as React.CSSProperties}
+        >
+          {folder.icon ? (
+            <span aria-hidden="true">{folder.icon}</span>
+          ) : (
+            <LiquidOrb
+              primaryColor={folder.color || '#3b82f6'}
+              secondaryColor={folder.secondaryColor}
+              size={18}
+            />
+          )}
+          <span className="folder-label">{folder.name}</span>
+        </button>
+        <button
+          className={menuCoords ? 'sidebar-more active' : 'sidebar-more'}
+          onClick={handleToggle}
+          aria-label={`Actions for ${folder.name}`}
+          title="Project options"
+        >
+          <MoreHorizontal size={15} />
+        </button>
+        {menuCoords ? (
+          <div
+            className="sidebar-context-menu"
+            style={{
+              position: 'fixed',
+              top: `${menuCoords.top}px`,
+              right: `${menuCoords.right}px`,
+              zIndex: 9999,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => {
+                onCreateProjectFolder(folder.id);
+                setMenuCoords(null);
+              }}
+            >
+              New folder
+            </button>
+            <button
+              onClick={() => {
+                onEditFolder(folder);
+                setMenuCoords(null);
+              }}
+            >
+              Edit project
+            </button>
+            <button
+              onClick={() => {
+                onChangeFolderIcon(folder.id);
+                setMenuCoords(null);
+              }}
+            >
+              Change icon
+            </button>
+            <button
+              onClick={() => {
+                onDuplicateFolder(folder.id);
+                setMenuCoords(null);
+              }}
+            >
+              Duplicate
+            </button>
+            <button
+              className="danger"
+              onClick={() => {
+                onDeleteFolder(folder.id);
+                setMenuCoords(null);
+              }}
+            >
+              Delete
+            </button>
+          </div>
+        ) : null}
+      </div>
+
+      {!collapsed && childFolders.length > 0 && (
+        <div className="child-folders-tree">
+          {childFolders.map((child) => (
+            <SubfolderItemRow
+              key={child.id}
+              child={child}
+              filter={filter}
+              onFilterChange={onFilterChange}
+              onViewChange={onViewChange}
+              onRenameFolder={onRenameFolder}
+              onRecolorFolder={onRecolorFolder}
+              onDuplicateFolder={onDuplicateFolder}
+              onDeleteFolder={onDeleteFolder}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubfolderItemRow({
+  child,
+  filter,
+  onFilterChange,
+  onViewChange,
+  onRenameFolder,
+  onRecolorFolder,
+  onDuplicateFolder,
+  onDeleteFolder,
+}: {
+  child: FolderType;
+  filter: LibraryFilter;
+  onFilterChange: (filter: LibraryFilter) => void;
+  onViewChange: (view: 'home' | 'notes' | 'templates') => void;
+  onRenameFolder: (id: string) => void;
+  onRecolorFolder: (id: string) => void;
+  onDuplicateFolder: (id: string) => void;
+  onDeleteFolder: (id: string) => void;
+}) {
+  const [menuCoords, setMenuCoords] = useState<{ top: number; right: number } | null>(null);
+  const isChildActive = filterMatches(filter, { type: 'folder', id: child.id });
+
+  useEffect(() => {
+    if (!menuCoords) return;
+
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as Element;
+      if (target.closest('.sidebar-context-menu, .sidebar-more')) return;
+      setMenuCoords(null);
+    };
+
+    const animFrame = requestAnimationFrame(() => {
+      window.addEventListener('click', handleOutsideClick);
+    });
+
+    return () => {
+      cancelAnimationFrame(animFrame);
+      window.removeEventListener('click', handleOutsideClick);
+    };
+  }, [menuCoords]);
+
+  const handleToggle = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    if (menuCoords) {
+      setMenuCoords(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const openUp = rect.bottom + 190 > window.innerHeight;
+    setMenuCoords({
+      top: openUp ? rect.top - 180 : rect.bottom + 4,
+      right: Math.max(12, window.innerWidth - rect.right),
+    });
+  };
+
+  return (
+    <div className={isChildActive ? 'sidebar-row child-folder active' : menuCoords ? 'sidebar-row child-folder has-menu-open' : 'sidebar-row child-folder'}>
+      <button
+        className="sidebar-row-click-target"
+        onClick={() => {
+          onFilterChange({ type: 'folder', id: child.id });
+          onViewChange('notes');
+        }}
+        title={child.name}
+      >
+        <span
+          className="child-folder-dot"
+          style={{ background: child.color || '#f97316' }}
+        />
+        <span className="folder-label">{child.name}</span>
+      </button>
+      <button
+        className={menuCoords ? 'sidebar-more active' : 'sidebar-more'}
+        onClick={handleToggle}
+        aria-label={`Actions for ${child.name}`}
+        title="Space options"
+      >
+        <MoreHorizontal size={14} />
+      </button>
+      {menuCoords ? (
+        <div
+          className="sidebar-context-menu"
+          style={{
+            position: 'fixed',
+            top: `${menuCoords.top}px`,
+            right: `${menuCoords.right}px`,
+            zIndex: 9999,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => {
+              onRenameFolder(child.id);
+              setMenuCoords(null);
+            }}
+          >
+            Rename space
+          </button>
+          <button
+            onClick={() => {
+              onRecolorFolder(child.id);
+              setMenuCoords(null);
+            }}
+          >
+            Change color
+          </button>
+          <button
+            onClick={() => {
+              onDuplicateFolder(child.id);
+              setMenuCoords(null);
+            }}
+          >
+            Duplicate
+          </button>
+          <button
+            className="danger"
+            onClick={() => {
+              onDeleteFolder(child.id);
+              setMenuCoords(null);
+            }}
+          >
+            Delete
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }

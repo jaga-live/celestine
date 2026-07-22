@@ -278,18 +278,11 @@ export function HomeDesk({
     return () => window.removeEventListener('pointerdown', closeMenu);
   }, [newMenuOpen]);
 
-  const handleTitleBarDoubleClick = (event: React.MouseEvent<HTMLElement>) => {
-    if ((event.target as HTMLElement).closest('button, input, select, a')) return;
-    if ('__TAURI_INTERNALS__' in window || '__TAURI__' in window)
-      void getCurrentWindow().toggleMaximize();
-  };
-
   return (
     <section className="celestine-home">
       <header
         className="celestine-topbar"
         data-tauri-drag-region
-        onDoubleClick={handleTitleBarDoubleClick}
       >
         <button className="celestine-search search-button" onClick={onOpenSearch}>
           <Search size={15} />

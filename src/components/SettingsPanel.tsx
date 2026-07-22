@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Download,
   Keyboard,
@@ -26,7 +26,7 @@ interface SettingsPanelProps {
   onImportData: (file: File) => void;
 }
 
-type SettingsCategory = 'profile' | 'appearance' | 'writing' | 'shortcuts' | 'data';
+type SettingsCategory = 'profile' | 'appearance' | 'writing' | 'keybinds' | 'data';
 
 const themes: { id: Theme; label: string; icon: typeof Moon }[] = [
   { id: 'dark', label: 'Dark', icon: Moon },
@@ -37,7 +37,7 @@ const categories: { id: SettingsCategory; label: string; icon: typeof UserRound 
   { id: 'profile', label: 'Profile', icon: UserRound },
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'writing', label: 'Writing & canvas', icon: PenLine },
-  { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
+  { id: 'keybinds', label: 'Keybinds', icon: Keyboard },
   { id: 'data', label: 'Data & about', icon: Settings2 },
 ];
 
@@ -52,7 +52,20 @@ export function SettingsPanel({
   onImportData,
 }: SettingsPanelProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>('profile');
+  const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
   const importRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.mediaDevices?.enumerateDevices) {
+      navigator.mediaDevices
+        .enumerateDevices()
+        .then((devices) => {
+          const inputs = devices.filter((device) => device.kind === 'audioinput');
+          setAudioDevices(inputs);
+        })
+        .catch(() => {});
+    }
+  }, []);
   const update = <Key extends keyof Settings>(key: Key, value: Settings[Key]) =>
     onChange({ ...settings, [key]: value });
 
@@ -158,14 +171,6 @@ export function SettingsPanel({
                 </section>
                 <section className="settings-section">
                   <h3>Home space</h3>
-                  <label className="select-setting">
-                    <span>Focus message</span>
-                    <input
-                      value={settings.focusMessage ?? ''}
-                      placeholder="Optional private reminder"
-                      onChange={(event) => update('focusMessage', event.target.value)}
-                    />
-                  </label>
                   <label className="settings-toggle">
                     <span>
                       <strong>Show home utility panel</strong>
@@ -288,14 +293,39 @@ export function SettingsPanel({
                   <label className="select-setting">
                     <span>Converted font</span>
                     <select
+                      className={`handwriting-font-select font-${settings.handwritingFont}`}
                       value={settings.handwritingFont}
                       onChange={(event) =>
                         update('handwritingFont', event.target.value as Settings['handwritingFont'])
                       }
+                      style={{
+                        fontFamily:
+                          settings.handwritingFont === 'chalkboard'
+                            ? "'Chalkboard SE', 'Chalkboard', cursive"
+                            : settings.handwritingFont === 'noteworthy'
+                              ? "'Noteworthy', cursive"
+                              : "'Bradley Hand', cursive",
+                        fontSize: '18px',
+                      }}
                     >
-                      <option value="chalkboard">Chalkboard</option>
-                      <option value="noteworthy">Noteworthy</option>
-                      <option value="bradley-hand">Bradley Hand</option>
+                      <option
+                        value="chalkboard"
+                        style={{ fontFamily: "'Chalkboard SE', 'Chalkboard', cursive", fontSize: '18px' }}
+                      >
+                        Chalkboard
+                      </option>
+                      <option
+                        value="noteworthy"
+                        style={{ fontFamily: "'Noteworthy', cursive", fontSize: '18px' }}
+                      >
+                        Noteworthy
+                      </option>
+                      <option
+                        value="bradley-hand"
+                        style={{ fontFamily: "'Bradley Hand', cursive", fontSize: '18px' }}
+                      >
+                        Bradley Hand
+                      </option>
                     </select>
                   </label>
                 </section>
@@ -305,11 +335,17 @@ export function SettingsPanel({
                     <span>
                       <Mic size={16} /> Microphone
                     </span>
-                    <input
+                    <select
                       value={settings.microphoneId ?? ''}
-                      placeholder="System default"
                       onChange={(event) => update('microphoneId', event.target.value)}
-                    />
+                    >
+                      <option value="">System default microphone</option>
+                      {audioDevices.map((device, index) => (
+                        <option key={device.deviceId || index} value={device.deviceId}>
+                          {device.label || `Microphone ${index + 1}`}
+                        </option>
+                      ))}
+                    </select>
                   </label>
                   <label className="settings-toggle">
                     <span>
@@ -326,17 +362,61 @@ export function SettingsPanel({
               </>
             ) : null}
 
-            {activeCategory === 'shortcuts' ? (
+            {activeCategory === 'keybinds' ? (
               <>
                 <section className="settings-section">
-                  <h3>XP-Pen shortcuts</h3>
-                  <p>Map these keys in the XP-Pen per-app profile.</p>
+                  <h3>Creation & Global Keybinds</h3>
+                  <p>
+                    Use <code>Cmd / Ctrl + Shift + Key</code> to create notes and open workspaces instantly.
+                  </p>
                   <div className="shortcut-grid">
-                    {Object.entries(settings.shortcuts).map(([command, shortcut]) => (
+                    {Object.entries({
+                      quickNote: 'Quick note',
+                      newNote: 'New note',
+                      canvas: 'New canvas',
+                      meeting: 'Meeting note',
+                    }).map(([key, label]) => {
+                      const currentGlobals = settings.globalShortcuts ?? {
+                        quickNote: 'q',
+                        newNote: 'n',
+                        canvas: 'd',
+                        meeting: 'm',
+                      };
+                      const val = (currentGlobals[key] ?? key[0]).toUpperCase();
+
+                      return (
+                        <label key={key}>
+                          <span>{label}</span>
+                          <input
+                            value={val}
+                            maxLength={1}
+                            onChange={(event) =>
+                              update('globalShortcuts', {
+                                ...currentGlobals,
+                                [key]: event.target.value.toLowerCase(),
+                              })
+                            }
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+                </section>
+                <section className="settings-section">
+                  <h3>Tools & Drawing Keybinds</h3>
+                  <p>Single key shortcuts for switching tools when editing notes or canvas.</p>
+                  <div className="shortcut-grid">
+                    {Object.entries({
+                      pen: 'Pen tool',
+                      eraser: 'Eraser tool',
+                      select: 'Select tool',
+                      text: 'Text tool',
+                      handwriting: 'Handwriting tool',
+                    }).map(([command, label]) => (
                       <label key={command}>
-                        <span>{command}</span>
+                        <span>{label}</span>
                         <input
-                          value={shortcut.toUpperCase()}
+                          value={(settings.shortcuts[command as keyof typeof settings.shortcuts] ?? '').toUpperCase()}
                           maxLength={1}
                           onChange={(event) =>
                             update('shortcuts', {
@@ -360,29 +440,28 @@ export function SettingsPanel({
                   </button>
                 </section>
                 <section className="settings-section">
-                  <h3>Global shortcuts</h3>
-                  <p>
-                    These work while Celestine is focused. Configure the same keys in your desktop
-                    shortcut utility for system-wide use.
-                  </p>
+                  <h3>System Keybinds</h3>
+                  <label className="select-setting" style={{ marginBottom: '16px' }}>
+                    <span>Confirm before quit (Cmd+Q)</span>
+                    <select
+                      value={settings.confirmQuit ?? 'ask'}
+                      onChange={(event) =>
+                        update('confirmQuit', event.target.value as 'ask' | 'never')
+                      }
+                    >
+                      <option value="ask">Ask for confirmation</option>
+                      <option value="never">Quit immediately</option>
+                    </select>
+                  </label>
                   <div className="shortcut-grid">
-                    {Object.entries(
-                      settings.globalShortcuts ?? { quickNote: 'q', canvas: 'd', meeting: 'm' },
-                    ).map(([command, shortcut]) => (
-                      <label key={command}>
-                        <span>{command}</span>
-                        <input
-                          value={shortcut.toUpperCase()}
-                          maxLength={1}
-                          onChange={(event) =>
-                            update('globalShortcuts', {
-                              ...(settings.globalShortcuts ?? {}),
-                              [command]: event.target.value.toLowerCase(),
-                            })
-                          }
-                        />
-                      </label>
-                    ))}
+                    <label>
+                      <span>Command palette</span>
+                      <input value="K" disabled readOnly />
+                    </label>
+                    <label>
+                      <span>Settings panel</span>
+                      <input value="," disabled readOnly />
+                    </label>
                   </div>
                 </section>
               </>

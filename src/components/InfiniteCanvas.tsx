@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ImagePlus, Layers2, LoaderCircle, Maximize2, Minus, Plus } from 'lucide-react';
+import { Check, ImagePlus, Layers2, LoaderCircle, Maximize2, Minus, Plus, Redo2, Undo2 } from 'lucide-react';
 import type {
   Camera,
   CanvasPattern,
@@ -205,6 +205,44 @@ export function InfiniteCanvas({
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [backgroundOpen, setBackgroundOpen] = useState(false);
+  const [undoStack, setUndoStack] = useState<CanvasObject[][]>([]);
+  const [redoStack, setRedoStack] = useState<CanvasObject[][]>([]);
+
+  const replaceObjects = (objects: CanvasObject[], recordHistory = true) => {
+    if (recordHistory) {
+      setUndoStack((stack) => [...stack.slice(-50), noteRef.current.objects]);
+      setRedoStack([]);
+    }
+
+    const nextNote = { ...noteRef.current, objects, updatedAt: Date.now() };
+
+    noteRef.current = nextNote;
+    onChange(nextNote);
+  };
+
+  const handleUndo = () => {
+    if (!undoStack.length) {
+      return;
+    }
+
+    const previous = undoStack[undoStack.length - 1];
+
+    setUndoStack((stack) => stack.slice(0, -1));
+    setRedoStack((stack) => [...stack, noteRef.current.objects]);
+    replaceObjects(previous, false);
+  };
+
+  const handleRedo = () => {
+    if (!redoStack.length) {
+      return;
+    }
+
+    const next = redoStack[redoStack.length - 1];
+
+    setRedoStack((stack) => stack.slice(0, -1));
+    setUndoStack((stack) => [...stack, noteRef.current.objects]);
+    replaceObjects(next, false);
+  };
 
   const camera = note.camera;
 
@@ -248,8 +286,26 @@ export function InfiniteCanvas({
 
   useEffect(() => {
     const keyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+
       if (event.code === 'Space' && !event.repeat) {
         setSpaceHeld(true);
+      }
+
+      if (target.matches('input, textarea, select') || target.isContentEditable) {
+        return;
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
+        event.preventDefault();
+        if (event.shiftKey) {
+          handleRedo();
+        } else {
+          handleUndo();
+        }
+      } else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'y') {
+        event.preventDefault();
+        handleRedo();
       }
     };
     const keyUp = (event: KeyboardEvent) => {
@@ -265,7 +321,7 @@ export function InfiniteCanvas({
       window.removeEventListener('keydown', keyDown);
       window.removeEventListener('keyup', keyUp);
     };
-  }, []);
+  }, [undoStack, redoStack]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -377,12 +433,7 @@ export function InfiniteCanvas({
     return events.map(pointerWorldPoint);
   };
 
-  const replaceObjects = (objects: CanvasObject[]) => {
-    const nextNote = { ...noteRef.current, objects, updatedAt: Date.now() };
 
-    noteRef.current = nextNote;
-    onChange(nextNote);
-  };
 
   const updateCamera = (nextCamera: Camera) => {
     const nextNote = { ...noteRef.current, camera: nextCamera };
@@ -412,32 +463,38 @@ export function InfiniteCanvas({
 
   const replaceRecognizedStrokes = (state: ConversionState, text: string) => {
     const currentNote = noteRef.current;
+    const convertedStrokes = currentNote.objects.filter(
+      (object): object is InkStroke =>
+        object.type === 'stroke' && state.objectIds.includes(object.id),
+    );
+    const scribbleColor = convertedStrokes[0]?.color || '#4c9bff';
+    const firstPoint = convertedStrokes[0]?.points?.[0];
+    const bounds = convertedStrokes.length ? mergeBounds(convertedStrokes) : state.bounds;
+
+    const startX = firstPoint ? firstPoint.x : bounds.x;
+    const startY = firstPoint ? firstPoint.y : bounds.y;
+
     const paragraphs = escapeHtml(text)
       .split('\n')
-      .map((line) => `<p>${line || '<br>'}</p>`)
+      .map((line) => `<p><span style="color: ${scribbleColor}">${line || '<br>'}</span></p>`)
       .join('');
+
     const textObject: TextObject = {
       id: makeId('handwriting'),
       type: 'text',
-      x: state.bounds.x,
-      y: state.bounds.y,
-      width: Math.max(180, Math.min(720, state.bounds.width + 36)),
+      x: startX,
+      y: startY,
+      width: Math.max(60, Math.min(720, Math.ceil(bounds.width + 16))),
       html: paragraphs,
       textStyle: 'handwriting',
       handwritingFont: settings.handwritingFont,
       createdAt: Date.now(),
     };
-    const nextNote = {
-      ...currentNote,
-      updatedAt: Date.now(),
-      objects: [
-        ...currentNote.objects.filter((object) => !state.objectIds.includes(object.id)),
-        textObject,
-      ],
-    };
 
-    noteRef.current = nextNote;
-    onChange(nextNote);
+    replaceObjects([
+      ...currentNote.objects.filter((object) => !state.objectIds.includes(object.id)),
+      textObject,
+    ]);
     setSelectedObjectId(textObject.id);
     setConversion(null);
   };
@@ -445,7 +502,6 @@ export function InfiniteCanvas({
   const recognizeStrokes = (
     strokes: InkStroke[],
     bounds: WorldRect,
-    mode: 'manual' | 'automatic',
   ) => {
     const state: ConversionState = {
       status: 'recognizing',
@@ -455,31 +511,17 @@ export function InfiniteCanvas({
     };
     const noteId = noteRef.current.id;
 
-    setConversion(state);
     recognizeHandwriting(rasterizeStrokes(strokes, bounds))
       .then((text) => {
-        if (noteRef.current.id !== noteId) {
+        if (noteRef.current.id !== noteId || !text.trim()) {
+          setConversion(null);
           return;
         }
 
-        if (mode === 'automatic') {
-          replaceRecognizedStrokes(state, text);
-
-          return;
-        }
-
-        setConversion({ ...state, status: 'ready', text });
+        replaceRecognizedStrokes(state, text);
       })
-      .catch((error: unknown) => {
-        if (noteRef.current.id !== noteId) {
-          return;
-        }
-
-        setConversion({
-          ...state,
-          status: 'error',
-          message: error instanceof Error ? error.message : String(error),
-        });
+      .catch(() => {
+        setConversion(null);
       });
   };
 
@@ -490,18 +532,10 @@ export function InfiniteCanvas({
     );
 
     if (bounds.width < 8 || bounds.height < 8 || !strokes.length) {
-      setConversion({
-        status: 'error',
-        bounds,
-        objectIds: [],
-        text: '',
-        message: 'Draw a box around one or more ink strokes.',
-      });
-
       return;
     }
 
-    recognizeStrokes(strokes, mergeBounds(strokes), 'manual');
+    recognizeStrokes(strokes, mergeBounds(strokes));
   };
 
   const queueAutomaticConversion = (stroke: InkStroke) => {
@@ -521,7 +555,7 @@ export function InfiniteCanvas({
       autoConversionTimer.current = null;
 
       if (strokes.length) {
-        recognizeStrokes(strokes, mergeBounds(strokes), 'automatic');
+        recognizeStrokes(strokes, mergeBounds(strokes));
       }
     }, settings.conversionDelayMs);
   };
@@ -724,14 +758,27 @@ export function InfiniteCanvas({
     }
 
     if (shapeDraft) {
+      const selectedShapeType = settings.selectedShape ?? 'rectangle';
       const shape: ShapeObject = {
         id: makeId('shape'),
         type: 'shape',
-        shape: 'rectangle',
-        x: Math.min(shapeDraft.start.x, shapeDraft.end.x),
-        y: Math.min(shapeDraft.start.y, shapeDraft.end.y),
-        width: Math.abs(shapeDraft.end.x - shapeDraft.start.x),
-        height: Math.abs(shapeDraft.end.y - shapeDraft.start.y),
+        shape: selectedShapeType,
+        x:
+          selectedShapeType === 'arrow' || selectedShapeType === 'line'
+            ? shapeDraft.start.x
+            : Math.min(shapeDraft.start.x, shapeDraft.end.x),
+        y:
+          selectedShapeType === 'arrow' || selectedShapeType === 'line'
+            ? shapeDraft.start.y
+            : Math.min(shapeDraft.start.y, shapeDraft.end.y),
+        width:
+          selectedShapeType === 'arrow' || selectedShapeType === 'line'
+            ? shapeDraft.end.x - shapeDraft.start.x
+            : Math.abs(shapeDraft.end.x - shapeDraft.start.x),
+        height:
+          selectedShapeType === 'arrow' || selectedShapeType === 'line'
+            ? shapeDraft.end.y - shapeDraft.start.y
+            : Math.abs(shapeDraft.end.y - shapeDraft.start.y),
         color: settings.penColor,
         createdAt: Date.now(),
       };
@@ -924,6 +971,22 @@ export function InfiniteCanvas({
 
       <div className="canvas-controls" onPointerDown={(event) => event.stopPropagation()}>
         <button
+          onClick={handleUndo}
+          disabled={!undoStack.length}
+          aria-label="Undo"
+          title="Undo (⌘Z)"
+        >
+          <Undo2 size={14} />
+        </button>
+        <button
+          onClick={handleRedo}
+          disabled={!redoStack.length}
+          aria-label="Redo"
+          title="Redo (⌘⇧Z)"
+        >
+          <Redo2 size={14} />
+        </button>
+        <button
           className={backgroundOpen ? 'background-button active' : 'background-button'}
           onClick={() => setBackgroundOpen((open) => !open)}
           aria-label="Canvas background"
@@ -983,44 +1046,7 @@ export function InfiniteCanvas({
         <div className="canvas-hint">Draw a box around handwriting to convert it</div>
       ) : null}
 
-      {conversion ? (
-        <div
-          className="conversion-popover tinted-glass"
-          onPointerDown={(event) => event.stopPropagation()}
-        >
-          {conversion.status === 'recognizing' ? (
-            <div className="conversion-message">
-              <LoaderCircle size={16} className="spin" /> Reading on this Mac…
-            </div>
-          ) : null}
-          {conversion.status === 'ready' ? (
-            <>
-              <label htmlFor="recognized-text">Recognized text</label>
-              <textarea
-                id="recognized-text"
-                value={conversion.text}
-                onChange={(event) => setConversion({ ...conversion, text: event.target.value })}
-              />
-              <div className="conversion-actions">
-                <button onClick={() => setConversion(null)}>Keep ink</button>
-                <button
-                  className="primary"
-                  onClick={() => replaceRecognizedStrokes(conversion, conversion.text)}
-                  disabled={!conversion.text.trim()}
-                >
-                  Replace with text
-                </button>
-              </div>
-            </>
-          ) : null}
-          {conversion.status === 'error' ? (
-            <>
-              <p>{conversion.message}</p>
-              <button onClick={() => setConversion(null)}>Close</button>
-            </>
-          ) : null}
-        </div>
-      ) : null}
+
 
       <input
         ref={fileInputRef}
@@ -1063,14 +1089,27 @@ function drawCanvas(
   });
 
   if (draft) {
+    const selectedShapeType = settings.selectedShape ?? 'rectangle';
     drawShape(context, {
       id: 'draft',
       type: 'shape',
-      shape: 'rectangle',
-      x: Math.min(draft.start.x, draft.end.x),
-      y: Math.min(draft.start.y, draft.end.y),
-      width: Math.abs(draft.end.x - draft.start.x),
-      height: Math.abs(draft.end.y - draft.start.y),
+      shape: selectedShapeType,
+      x:
+        selectedShapeType === 'arrow' || selectedShapeType === 'line'
+          ? draft.start.x
+          : Math.min(draft.start.x, draft.end.x),
+      y:
+        selectedShapeType === 'arrow' || selectedShapeType === 'line'
+          ? draft.start.y
+          : Math.min(draft.start.y, draft.end.y),
+      width:
+        selectedShapeType === 'arrow' || selectedShapeType === 'line'
+          ? draft.end.x - draft.start.x
+          : Math.abs(draft.end.x - draft.start.x),
+      height:
+        selectedShapeType === 'arrow' || selectedShapeType === 'line'
+          ? draft.end.y - draft.start.y
+          : Math.abs(draft.end.y - draft.start.y),
       color: '#d46a61',
       createdAt: Date.now(),
     });
@@ -1209,6 +1248,37 @@ function drawShape(context: CanvasRenderingContext2D, shape: ShapeObject) {
       Math.PI * 2,
     );
     context.fill();
+    context.stroke();
+  }
+
+  if (shape.shape === 'diamond') {
+    const cx = shape.x + shape.width / 2;
+    const cy = shape.y + shape.height / 2;
+    context.beginPath();
+    context.moveTo(cx, shape.y);
+    context.lineTo(shape.x + shape.width, cy);
+    context.lineTo(cx, shape.y + shape.height);
+    context.lineTo(shape.x, cy);
+    context.closePath();
+    context.fill();
+    context.stroke();
+  }
+
+  if (shape.shape === 'triangle') {
+    const cx = shape.x + shape.width / 2;
+    context.beginPath();
+    context.moveTo(cx, shape.y);
+    context.lineTo(shape.x + shape.width, shape.y + shape.height);
+    context.lineTo(shape.x, shape.y + shape.height);
+    context.closePath();
+    context.fill();
+    context.stroke();
+  }
+
+  if (shape.shape === 'line') {
+    context.beginPath();
+    context.moveTo(shape.x, shape.y);
+    context.lineTo(shape.x + shape.width, shape.y + shape.height);
     context.stroke();
   }
 

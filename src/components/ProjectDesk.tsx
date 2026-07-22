@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import {
   ArrowLeft,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   Clock,
   FileText,
   FolderPlus,
   Folder as FolderIcon,
+  FolderOpen,
   Layers,
   Mic,
   MoreHorizontal,
@@ -67,10 +69,16 @@ export function ProjectDesk({
   const projectFolders = folders.filter((f) => f.parentId === project.id);
   const rootNotes = notes.filter((n) => n.folderId === project.id);
 
-  // Track open/collapsed state for spaces
+  // Track open/collapsed state for spaces and tree map
   const [collapsedSpaces, setCollapsedSpaces] = useState<Record<string, boolean>>({});
+  const [collapsedNodes, setCollapsedNodes] = useState<Record<string, boolean>>({});
   const [folderMenuId, setFolderMenuId] = useState<string | null>(null);
   const [folderMenuPlacement, setFolderMenuPlacement] = useState<'up' | 'down'>('down');
+
+  const toggleNode = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setCollapsedNodes((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   useEffect(() => {
     if (!folderMenuId) return;
@@ -137,66 +145,97 @@ export function ProjectDesk({
             <div
               className="tree-item root-item"
               onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-              title="Scroll to project top"
+              title="Click to scroll to top"
             >
-              <FolderIcon size={15} className="tree-icon" />
-              <span>{project.name}</span>
-            </div>
-            <div className="tree-children">
-              {rootNotes.map((rootNote) => (
-                <div
-                  key={rootNote.id}
-                  className="tree-item folder-item"
-                  onClick={() => onOpenNote(rootNote.id)}
-                  title="Open root note"
-                >
-                  <span className="tree-line" />
-                  <FileText size={13} className="tree-icon icon-blue" />
-                  <span>{rootNote.title || 'Untitled note'}</span>
-                </div>
-              ))}
-              {projectFolders.map((folder) => {
-                const childNotes = notes.filter((n) => n.folderId === folder.id);
-                return (
-                  <div key={folder.id} className="tree-node">
-                    <div
-                      className="tree-item folder-item"
-                      onClick={() => {
-                        const el = document.getElementById(`space-${folder.id}`);
-                        if (el) el.scrollIntoView({ behavior: 'smooth' });
-                      }}
-                      title="Scroll to space folder"
-                    >
-                      <span className="tree-line" />
-                      <FolderIcon size={14} className="tree-icon" />
-                      <span>{folder.name}</span>
-                    </div>
-                    {childNotes.length > 0 && (
-                      <div className="tree-subchildren">
-                        {childNotes.map((subNote) => (
-                          <div
-                            key={subNote.id}
-                            className="tree-item subfolder-item"
-                            onClick={() => onOpenNote(subNote.id)}
-                            title="Open note"
-                          >
-                            <span className="tree-line" />
-                            <FileText size={12} className="tree-icon" />
-                            <span>{subNote.title || 'Untitled'}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              {projectFolders.length === 0 && rootNotes.length === 0 && (
-                <div className="tree-item empty-item">
-                  <span className="tree-line" />
-                  <span className="text-muted">No files or spaces created</span>
-                </div>
+              <button
+                className="tree-toggle-btn"
+                onClick={(e) => toggleNode('root', e)}
+                title={collapsedNodes['root'] ? 'Expand project' : 'Collapse project'}
+              >
+                {collapsedNodes['root'] ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+              </button>
+              {collapsedNodes['root'] ? (
+                <FolderIcon size={16} className="tree-icon icon-blue" />
+              ) : (
+                <FolderOpen size={16} className="tree-icon icon-blue" />
               )}
+              <strong className="tree-title">{project.name}</strong>
+              <span className="tree-action-hint">Top ↑</span>
             </div>
+
+            {!collapsedNodes['root'] && (
+              <div className="tree-children">
+                {rootNotes.map((rootNote) => (
+                  <div
+                    key={rootNote.id}
+                    className="tree-item folder-item note-node"
+                    onClick={() => onOpenNote(rootNote.id)}
+                    title="Click to open note"
+                  >
+                    <span className="tree-line" />
+                    <FileText size={14} className="tree-icon icon-blue" />
+                    <span>{rootNote.title || 'Untitled note'}</span>
+                    <span className="tree-action-hint">Open ↗</span>
+                  </div>
+                ))}
+                {projectFolders.map((folder) => {
+                  const childNotes = notes.filter((n) => n.folderId === folder.id);
+                  const isCollapsed = Boolean(collapsedNodes[folder.id]);
+
+                  return (
+                    <div key={folder.id} className="tree-node">
+                      <div
+                        className="tree-item folder-item"
+                        onClick={() => {
+                          const el = document.getElementById(`space-${folder.id}`);
+                          if (el) el.scrollIntoView({ behavior: 'smooth' });
+                        }}
+                        title="Click to scroll to space"
+                      >
+                        <button
+                          className="tree-toggle-btn"
+                          onClick={(e) => toggleNode(folder.id, e)}
+                          title={isCollapsed ? 'Expand space' : 'Collapse space'}
+                        >
+                          {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+                        </button>
+                        <span className="tree-line" />
+                        {isCollapsed ? (
+                          <FolderIcon size={14} className="tree-icon" />
+                        ) : (
+                          <FolderOpen size={14} className="tree-icon" />
+                        )}
+                        <span>{folder.name}</span>
+                        <span className="tree-action-hint">Go to space ↵</span>
+                      </div>
+                      {!isCollapsed && childNotes.length > 0 && (
+                        <div className="tree-subchildren">
+                          {childNotes.map((subNote) => (
+                            <div
+                              key={subNote.id}
+                              className="tree-item subfolder-item note-node"
+                              onClick={() => onOpenNote(subNote.id)}
+                              title="Click to open note"
+                            >
+                              <span className="tree-line" />
+                              <FileText size={13} className="tree-icon" />
+                              <span>{subNote.title || 'Untitled'}</span>
+                              <span className="tree-action-hint">Open ↗</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {projectFolders.length === 0 && rootNotes.length === 0 && (
+                  <div className="tree-item empty-item">
+                    <span className="tree-line" />
+                    <span className="text-muted">No files or spaces created</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

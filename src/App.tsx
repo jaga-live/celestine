@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { defaultWorkspace } from './data/defaultWorkspace';
 import { DocumentEditor } from './components/DocumentEditor';
 import { EditorHeader } from './components/EditorHeader';
@@ -128,6 +129,14 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    try {
+      getCurrentWindow().maximize().catch(() => {});
+    } catch {
+      // Ignore if not in desktop window environment
+    }
+  }, []);
+
+  useEffect(() => {
     if (!workspace || !hydrated.current) {
       return;
     }
@@ -172,6 +181,26 @@ export default function App() {
         return;
       }
 
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'q') {
+        event.preventDefault();
+        const mode = workspace.settings.confirmQuit ?? 'ask';
+
+        if (mode === 'ask') {
+          setConfirmation({
+            title: 'Quit Celestine?',
+            message: 'Are you sure you want to exit Celestine?',
+            confirmLabel: 'Quit',
+            onConfirm: () => {
+              getCurrentWindow().close().catch(() => window.close());
+            },
+          });
+        } else {
+          getCurrentWindow().close().catch(() => window.close());
+        }
+
+        return;
+      }
+
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setCommandOpen(true);
@@ -179,28 +208,49 @@ export default function App() {
         return;
       }
 
-      if ((event.metaKey || event.ctrlKey) && event.shiftKey) {
-        const globalShortcuts = workspace.settings.globalShortcuts ?? {
-          quickNote: 'q',
-          canvas: 'd',
-          meeting: 'm',
-        };
-        const command = Object.entries(globalShortcuts).find(
-          ([, key]) => key === event.key.toLowerCase(),
-        )?.[0];
-        if (command) {
+      const key = event.key.toLowerCase();
+      const hasModifier = event.metaKey || event.ctrlKey || event.altKey;
+      const globalShortcuts = workspace.settings.globalShortcuts ?? {
+        quickNote: 'q',
+        newNote: 'n',
+        canvas: 'd',
+        meeting: 'm',
+      };
+
+      if (!hasModifier) {
+        if (key === (globalShortcuts.quickNote ?? 'q')) {
           event.preventDefault();
-          setQuickCaptureOpen(true);
+          createNote('document', 'thought');
+
+          return;
+        }
+
+        const shortcutEntry = Object.entries(workspace.settings.shortcuts).find(
+          ([, shortcut]) => shortcut === key,
+        );
+
+        if (shortcutEntry) {
+          setTool(shortcutEntry[0] as Tool);
+
           return;
         }
       }
 
-      const shortcutEntry = Object.entries(workspace.settings.shortcuts).find(
-        ([, shortcut]) => shortcut === event.key.toLowerCase(),
-      );
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey) {
+        const command = Object.entries(globalShortcuts).find(([, val]) => val === key)?.[0];
 
-      if (shortcutEntry) {
-        setTool(shortcutEntry[0] as Tool);
+        if (command) {
+          event.preventDefault();
+          if (command === 'newNote') {
+            createNote('document', 'blank');
+          } else if (command === 'canvas') {
+            createNote('canvas', 'blank');
+          } else if (command === 'meeting') {
+            createNote('document', 'meeting');
+          }
+
+          return;
+        }
       }
     };
 
@@ -356,7 +406,18 @@ export default function App() {
     template: CelestineTemplate = 'blank',
     quickCapture = false,
   ) => {
+    if (filter.type === 'trash' || filter.type === 'archive') {
+      setFilter({ type: 'all' });
+    }
+
     const folderId = filter.type === 'folder' ? filter.id : 'inbox';
+    const timestampLabel = new Intl.DateTimeFormat('en-US', {
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).format(Date.now());
     const templates: Record<CelestineTemplate, { title: string; html: string }> = {
       study: {
         title: 'Study notes',
@@ -373,8 +434,8 @@ export default function App() {
         html: '<h1>Revision deck</h1><p><em>Recall first. Review second.</em></p><h2>Question 01</h2><p>Write the prompt here, then hide the answer below.</p><blockquote><p>The answer, in the fewest useful words.</p></blockquote><h2>Confidence</h2><p>○ New &nbsp;&nbsp; ○ Learning &nbsp;&nbsp; ○ Known</p>',
       },
       thought: {
-        title: 'Quick thought',
-        html: '<h1>Quick thought</h1><p>There is something here worth keeping…</p>',
+        title: `Note - ${timestampLabel}`,
+        html: `<h1>Note - ${timestampLabel}</h1><ul><li><p></p></li></ul>`,
       },
       audio: {
         title: 'Audio note',
@@ -382,14 +443,10 @@ export default function App() {
       },
       blank: { title: 'Untitled canvas', html: '' },
     };
-    const timestampLabel = new Intl.DateTimeFormat(undefined, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }).format(Date.now());
     const quickTemplates: Partial<Record<CelestineTemplate, { title: string; html: string }>> = {
       thought: {
-        title: `Quick note · ${timestampLabel}`,
-        html: `<h1>Quick note · ${timestampLabel}</h1><p></p>`,
+        title: `Note - ${timestampLabel}`,
+        html: `<h1>Note - ${timestampLabel}</h1><ul><li><p></p></li></ul>`,
       },
       meeting: {
         title: `Meeting notes · ${timestampLabel}`,
@@ -431,119 +488,39 @@ export default function App() {
         {
           id: makeId('text'),
           type: 'text',
-          x: 52,
-          y: 34,
-          width: 520,
-          html: '<h1>Image processing system</h1><p>Example architecture · request path and durable storage</p>',
+          x: 60,
+          y: 40,
+          width: 540,
+          html: '<h1>System design workspace</h1><p>Example architecture · request flow, gateway &amp; storage</p>',
           createdAt: Date.now(),
         },
         {
           id: makeId('shape'),
           type: 'shape',
           shape: 'rectangle',
-          x: 70,
+          x: 60,
           y: 190,
           width: 170,
-          height: 86,
-          color: '#64b5ff',
+          height: 100,
+          color: '#4c9bff',
           createdAt: Date.now(),
         },
         {
           id: makeId('text'),
           type: 'text',
-          x: 97,
-          y: 211,
-          width: 116,
-          html: '<p><strong>Web app</strong></p><p>Upload image</p>',
-          createdAt: Date.now(),
-        },
-        {
-          id: makeId('shape'),
-          type: 'shape',
-          shape: 'rectangle',
-          x: 330,
-          y: 190,
-          width: 174,
-          height: 86,
-          color: '#8d7dff',
-          createdAt: Date.now(),
-        },
-        {
-          id: makeId('text'),
-          type: 'text',
-          x: 357,
-          y: 211,
-          width: 120,
-          html: '<p><strong>API service</strong></p><p>Validate request</p>',
-          createdAt: Date.now(),
-        },
-        {
-          id: makeId('shape'),
-          type: 'shape',
-          shape: 'rectangle',
-          x: 590,
-          y: 190,
-          width: 174,
-          height: 86,
-          color: '#66d6ac',
-          createdAt: Date.now(),
-        },
-        {
-          id: makeId('text'),
-          type: 'text',
-          x: 619,
-          y: 211,
-          width: 120,
-          html: '<p><strong>Object store</strong></p><p>Original files</p>',
-          createdAt: Date.now(),
-        },
-        {
-          id: makeId('shape'),
-          type: 'shape',
-          shape: 'rectangle',
-          x: 330,
-          y: 392,
-          width: 174,
-          height: 86,
-          color: '#e9b45f',
-          createdAt: Date.now(),
-        },
-        {
-          id: makeId('text'),
-          type: 'text',
-          x: 355,
-          y: 413,
-          width: 126,
-          html: '<p><strong>Job queue</strong></p><p>Async resize</p>',
-          createdAt: Date.now(),
-        },
-        {
-          id: makeId('shape'),
-          type: 'shape',
-          shape: 'rectangle',
-          x: 590,
-          y: 392,
-          width: 174,
-          height: 86,
-          color: '#f08383',
-          createdAt: Date.now(),
-        },
-        {
-          id: makeId('text'),
-          type: 'text',
-          x: 620,
-          y: 413,
-          width: 120,
-          html: '<p><strong>Worker</strong></p><p>Create variants</p>',
+          x: 75,
+          y: 218,
+          width: 140,
+          html: '<p style="text-align: center;"><strong>Web App</strong></p><p style="text-align: center; font-size: 12px; color: rgba(255,255,255,0.7);">Upload image</p>',
           createdAt: Date.now(),
         },
         {
           id: makeId('shape'),
           type: 'shape',
           shape: 'arrow',
-          x: 240,
-          y: 233,
-          width: 90,
+          x: 230,
+          y: 240,
+          width: 70,
           height: 0,
           color: '#9eb6d2',
           createdAt: Date.now(),
@@ -551,10 +528,30 @@ export default function App() {
         {
           id: makeId('shape'),
           type: 'shape',
+          shape: 'diamond',
+          x: 300,
+          y: 180,
+          width: 150,
+          height: 120,
+          color: '#8f65e9',
+          createdAt: Date.now(),
+        },
+        {
+          id: makeId('text'),
+          type: 'text',
+          x: 315,
+          y: 218,
+          width: 120,
+          html: '<p style="text-align: center;"><strong>API Service</strong></p><p style="text-align: center; font-size: 12px; color: rgba(255,255,255,0.7);">Validate request</p>',
+          createdAt: Date.now(),
+        },
+        {
+          id: makeId('shape'),
+          type: 'shape',
           shape: 'arrow',
-          x: 504,
-          y: 233,
-          width: 86,
+          x: 450,
+          y: 240,
+          width: 70,
           height: 0,
           color: '#9eb6d2',
           createdAt: Date.now(),
@@ -562,23 +559,83 @@ export default function App() {
         {
           id: makeId('shape'),
           type: 'shape',
+          shape: 'ellipse',
+          x: 520,
+          y: 185,
+          width: 160,
+          height: 110,
+          color: '#62b58f',
+          createdAt: Date.now(),
+        },
+        {
+          id: makeId('text'),
+          type: 'text',
+          x: 535,
+          y: 218,
+          width: 130,
+          html: '<p style="text-align: center;"><strong>Object Store</strong></p><p style="text-align: center; font-size: 12px; color: rgba(255,255,255,0.7);">Original files</p>',
+          createdAt: Date.now(),
+        },
+        {
+          id: makeId('shape'),
+          type: 'shape',
           shape: 'arrow',
-          x: 417,
-          y: 276,
+          x: 375,
+          y: 300,
           width: 0,
-          height: 116,
+          height: 80,
           color: '#9eb6d2',
           createdAt: Date.now(),
         },
         {
           id: makeId('shape'),
           type: 'shape',
+          shape: 'rectangle',
+          x: 295,
+          y: 380,
+          width: 160,
+          height: 100,
+          color: '#f19b3f',
+          createdAt: Date.now(),
+        },
+        {
+          id: makeId('text'),
+          type: 'text',
+          x: 310,
+          y: 408,
+          width: 130,
+          html: '<p style="text-align: center;"><strong>Job Queue</strong></p><p style="text-align: center; font-size: 12px; color: rgba(255,255,255,0.7);">Async resize</p>',
+          createdAt: Date.now(),
+        },
+        {
+          id: makeId('shape'),
+          type: 'shape',
           shape: 'arrow',
-          x: 504,
-          y: 435,
-          width: 86,
+          x: 455,
+          y: 430,
+          width: 65,
           height: 0,
           color: '#9eb6d2',
+          createdAt: Date.now(),
+        },
+        {
+          id: makeId('shape'),
+          type: 'shape',
+          shape: 'rectangle',
+          x: 520,
+          y: 380,
+          width: 160,
+          height: 100,
+          color: '#8f65e9',
+          createdAt: Date.now(),
+        },
+        {
+          id: makeId('text'),
+          type: 'text',
+          x: 535,
+          y: 408,
+          width: 130,
+          html: '<p style="text-align: center;"><strong>Worker</strong></p><p style="text-align: center; font-size: 12px; color: rgba(255,255,255,0.7);">Create variants</p>',
           createdAt: Date.now(),
         },
       ];
@@ -910,18 +967,41 @@ export default function App() {
     });
   };
   const trashNote = (noteId: string) => {
-    const source = workspace.notes.find((note) => note.id === noteId);
-    if (!source) return;
+    if (!workspace) return;
+    const remaining = workspace.notes.map((note) =>
+      note.id === noteId ? { ...note, deletedAt: Date.now() } : note,
+    );
+    const activeDeleted = workspace.activeNoteId === noteId;
+    const nextActiveId = activeDeleted
+      ? (remaining.find((n) => n.id !== noteId && !n.deletedAt)?.id ?? '')
+      : workspace.activeNoteId;
+
     setWorkspace({
       ...workspace,
-      notes: workspace.notes.map((note) =>
-        note.id === noteId ? { ...note, deletedAt: Date.now() } : note,
-      ),
+      notes: remaining,
+      activeNoteId: nextActiveId,
     });
   };
+
+  const trashSelectedNotes = (noteIds: string[]) => {
+    if (!workspace || !noteIds.length) return;
+    const remaining = workspace.notes.map((note) =>
+      noteIds.includes(note.id) ? { ...note, deletedAt: Date.now() } : note,
+    );
+    const activeDeleted = noteIds.includes(workspace.activeNoteId);
+    const nextActiveId = activeDeleted
+      ? (remaining.find((n) => !noteIds.includes(n.id) && !n.deletedAt)?.id ?? '')
+      : workspace.activeNoteId;
+
+    setWorkspace({
+      ...workspace,
+      notes: remaining,
+      activeNoteId: nextActiveId,
+    });
+  };
+
   const restoreNote = (noteId: string) => {
-    const source = workspace.notes.find((note) => note.id === noteId);
-    if (!source) return;
+    if (!workspace) return;
     setWorkspace({
       ...workspace,
       notes: workspace.notes.map((note) =>
@@ -931,43 +1011,61 @@ export default function App() {
       ),
     });
   };
+
   const deleteForever = (noteId: string) => {
+    if (!workspace) return;
     const source = workspace.notes.find((note) => note.id === noteId);
     if (!source) return;
     setConfirmation({
       title: `Delete “${source.title}” permanently?`,
-      message: 'This cannot be undone.',
+      message: 'This action cannot be undone.',
       confirmLabel: 'Delete permanently',
       onConfirm: () => {
-        const remaining = workspace.notes.filter((note) => note.id !== noteId);
-        setWorkspace({
-          ...workspace,
-          notes: remaining,
-          activeNoteId:
-            workspace.activeNoteId === noteId
-              ? (remaining.find((note) => !note.deletedAt)?.id ?? remaining[0]?.id ?? '')
-              : workspace.activeNoteId,
+        setWorkspace((prev) => {
+          if (!prev) return null;
+          const remaining = prev.notes.filter((note) => note.id !== noteId);
+          const activeDeleted = prev.activeNoteId === noteId;
+          const nextActiveId = activeDeleted
+            ? (remaining.find((n) => !n.deletedAt)?.id ?? remaining[0]?.id ?? '')
+            : prev.activeNoteId;
+
+          return {
+            ...prev,
+            notes: remaining,
+            activeNoteId: nextActiveId,
+          };
         });
       },
     });
   };
+
   const deleteSelectedForever = (noteIds: string[]) => {
-    if (!noteIds.length) return;
+    if (!workspace || !noteIds.length) return;
     setConfirmation({
-      title: `Delete ${noteIds.length} notes permanently?`,
-      message: 'This cannot be undone.',
+      title: `Delete ${noteIds.length} ${noteIds.length === 1 ? 'note' : 'notes'} permanently?`,
+      message: 'This action cannot be undone.',
       confirmLabel: 'Delete permanently',
       onConfirm: () => {
-        const remaining = workspace.notes.filter((note) => !noteIds.includes(note.id));
-        setWorkspace({
-          ...workspace,
-          notes: remaining,
-          activeNoteId: remaining.find((note) => !note.deletedAt)?.id ?? remaining[0]?.id ?? '',
+        setWorkspace((prev) => {
+          if (!prev) return null;
+          const remaining = prev.notes.filter((note) => !noteIds.includes(note.id));
+          const activeDeleted = noteIds.includes(prev.activeNoteId);
+          const nextActiveId = activeDeleted
+            ? (remaining.find((n) => !noteIds.includes(n.id) && !n.deletedAt)?.id ?? remaining[0]?.id ?? '')
+            : prev.activeNoteId;
+
+          return {
+            ...prev,
+            notes: remaining,
+            activeNoteId: nextActiveId,
+          };
         });
       },
     });
   };
+
   const emptyTrash = () => {
+    if (!workspace) return;
     const trashCount = workspace.notes.filter((note) => note.deletedAt).length;
     if (!trashCount) return;
     setConfirmation({
@@ -975,8 +1073,15 @@ export default function App() {
       message: `${trashCount} ${trashCount === 1 ? 'note will' : 'notes will'} be permanently deleted.`,
       confirmLabel: 'Empty trash',
       onConfirm: () => {
-        const remaining = workspace.notes.filter((note) => !note.deletedAt);
-        setWorkspace({ ...workspace, notes: remaining, activeNoteId: remaining[0]?.id ?? '' });
+        setWorkspace((prev) => {
+          if (!prev) return null;
+          const remaining = prev.notes.filter((note) => !note.deletedAt);
+          return {
+            ...prev,
+            notes: remaining,
+            activeNoteId: remaining[0]?.id ?? '',
+          };
+        });
       },
     });
   };
@@ -1215,6 +1320,7 @@ export default function App() {
       data-theme={workspace.settings.theme}
       style={{ '--accent': '#4c9bff', '--app-font-size': '16px' } as React.CSSProperties}
     >
+      <div className="top-window-drag-strip" data-tauri-drag-region />
       <div
         className={`${libraryVisible ? 'library-shell visible' : 'library-shell'}${homeOpen ? ' home-view' : ''}${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}
       >
@@ -1259,12 +1365,14 @@ export default function App() {
         <NotesList
           notes={visibleNotes}
           tags={workspace.tags}
+          folders={workspace.folders}
           activeNoteId={workspace.activeNoteId}
           search={search}
           title={filterTitle}
           breadcrumb={filterBreadcrumb}
           onSearchChange={setSearch}
           onSelectNote={openNote}
+          onSelectFolder={(folderId) => setFilter({ type: 'folder', id: folderId })}
           onCreateNote={createNote}
           onOpenAudio={() => setAudioOpen(true)}
           viewMode={noteView}
@@ -1277,6 +1385,7 @@ export default function App() {
           onRestore={restoreNote}
           onDeleteForever={deleteForever}
           onDeleteSelected={deleteSelectedForever}
+          onTrashSelected={trashSelectedNotes}
           onEmptyTrash={emptyTrash}
         />
       </div>
@@ -1345,6 +1454,10 @@ export default function App() {
           onCreate={createNote}
           customTemplates={workspace.customTemplates ?? []}
           onCreateCustom={(id) => {
+            if (filter.type === 'trash' || filter.type === 'archive') {
+              setFilter({ type: 'all' });
+            }
+
             const template = workspace.customTemplates?.find((item) => item.id === id);
             if (!template) return;
             const note = {
@@ -1566,6 +1679,9 @@ export default function App() {
                 settings={workspace.settings}
                 onToolChange={setTool}
                 onColorChange={(penColor) => updateSettings({ ...workspace.settings, penColor })}
+                onShapeChange={(selectedShape) =>
+                  updateSettings({ ...workspace.settings, selectedShape })
+                }
               />
             </DocumentEditor>
           ) : (
@@ -1658,6 +1774,9 @@ export default function App() {
                 settings={workspace.settings}
                 onToolChange={setTool}
                 onColorChange={(penColor) => updateSettings({ ...workspace.settings, penColor })}
+                onShapeChange={(selectedShape) =>
+                  updateSettings({ ...workspace.settings, selectedShape })
+                }
               />
             </>
           )}

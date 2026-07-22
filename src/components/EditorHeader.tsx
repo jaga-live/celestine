@@ -52,19 +52,9 @@ export function EditorHeader({
   onMove,
 }: EditorHeaderProps) {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
-  const handleDoubleClick = (event: React.MouseEvent<HTMLElement>) => {
-    if ((event.target as HTMLElement).closest('button')) {
-      return;
-    }
-
-    if ('__TAURI_INTERNALS__' in window || '__TAURI__' in window) {
-      void getCurrentWindow().toggleMaximize();
-    }
-  };
-
   return (
-    <header className="editor-header" data-tauri-drag-region onDoubleClick={handleDoubleClick}>
-      <div className="editor-heading">
+    <header className="editor-header" data-tauri-drag-region>
+      <div className="editor-heading" data-tauri-drag-region>
         <button
           className="icon-button"
           onClick={onToggleLibrary}

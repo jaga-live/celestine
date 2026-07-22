@@ -18,6 +18,7 @@ import {
   Italic,
   List,
   Minus,
+  Palette,
   Plus,
   Redo2,
   Table2,
@@ -25,6 +26,24 @@ import {
 } from 'lucide-react';
 import type { CanvasPattern, DocumentPage, InkStroke, Note, Point, Settings, Tool } from '../types';
 import { RichTextSlashMenu } from './RichTextSlashMenu';
+import { TextStyleMark } from '../lib/tiptapTextStyle';
+
+const PALETTE_COLORS = [
+  { id: 'default', label: 'Default', value: '' },
+  { id: 'white', label: 'White', value: '#ffffff' },
+  { id: 'muted', label: 'Muted', value: '#94a3b8' },
+  { id: 'red', label: 'Red', value: '#ff5c5c' },
+  { id: 'crimson', label: 'Crimson', value: '#e63946' },
+  { id: 'orange', label: 'Orange', value: '#ff8c38' },
+  { id: 'gold', label: 'Gold', value: '#ffd166' },
+  { id: 'yellow', label: 'Yellow', value: '#fee440' },
+  { id: 'mint', label: 'Mint', value: '#2ec4b6' },
+  { id: 'sky', label: 'Sky', value: '#3a86ff' },
+  { id: 'indigo', label: 'Indigo', value: '#4361ee' },
+  { id: 'purple', label: 'Purple', value: '#8a2be2' },
+  { id: 'pink', label: 'Pink', value: '#ff70a6' },
+  { id: 'magenta', label: 'Magenta', value: '#f72585' },
+];
 
 interface DocumentEditorProps {
   note: Note;
@@ -81,6 +100,7 @@ export function DocumentEditor({
 }: DocumentEditorProps) {
   const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
   const [paperMenuOpen, setPaperMenuOpen] = useState(false);
+  const [colorMenuOpen, setColorMenuOpen] = useState(false);
   const [documentZoom, setDocumentZoom] = useState(1.28);
   const wordCount = useMemo(() => {
     const text = note.pages.map((p) => p.html.replace(/<[^>]*>/g, ' ')).join(' ');
@@ -162,6 +182,72 @@ export function DocumentEditor({
           {formatButton('Redo', <Redo2 size={16} />, (editor) =>
             editor.chain().focus().redo().run(),
           )}
+          <span />
+          <select
+            className="toolbar-select"
+            aria-label="Font size"
+            disabled={!activeEditor}
+            onChange={(event) => {
+              const val = event.target.value;
+              if (activeEditor) {
+                if (val === 'normal') {
+                  activeEditor.chain().focus().setMark('textStyle', { fontSize: null }).run();
+                } else {
+                  activeEditor.chain().focus().setMark('textStyle', { fontSize: val }).run();
+                }
+              }
+            }}
+          >
+            <option value="normal">Size</option>
+            <option value="13px">13px</option>
+            <option value="16px">16px</option>
+            <option value="20px">20px</option>
+            <option value="26px">26px</option>
+            <option value="34px">34px</option>
+          </select>
+          <div className="color-palette-container">
+            <button
+              className={colorMenuOpen ? 'active' : ''}
+              disabled={!activeEditor}
+              onClick={() => setColorMenuOpen((open) => !open)}
+              aria-label="Color palette"
+              title="Text color"
+            >
+              <Palette size={16} />
+            </button>
+            {colorMenuOpen && activeEditor ? (
+              <div className="text-color-palette tinted-glass">
+                <div className="swatch-grid">
+                  {PALETTE_COLORS.map((c) => (
+                    <button
+                      key={c.id}
+                      className="swatch-item"
+                      style={{ backgroundColor: c.value || '#e2e8f0' }}
+                      title={c.label}
+                      onClick={() => {
+                        if (c.value) {
+                          activeEditor.chain().focus().setMark('textStyle', { color: c.value }).run();
+                        } else {
+                          activeEditor.chain().focus().setMark('textStyle', { color: null }).run();
+                        }
+                        setColorMenuOpen(false);
+                      }}
+                    />
+                  ))}
+                </div>
+                <label className="custom-color-row">
+                  <span>Custom</span>
+                  <input
+                    type="color"
+                    onChange={(event) => {
+                      activeEditor.chain().focus().setMark('textStyle', { color: event.target.value }).run();
+                      setColorMenuOpen(false);
+                    }}
+                  />
+                </label>
+              </div>
+            ) : null}
+          </div>
           <span />
           {formatButton(
             'Bold',
@@ -331,6 +417,7 @@ function DocumentPageEditor({
   const editor = useEditor({
     extensions: [
       StarterKit,
+      TextStyleMark,
       Placeholder.configure({ placeholder: 'Start writing…' }),
       TaskList,
       TaskItem.configure({ nested: true }),
@@ -381,6 +468,23 @@ function DocumentPageEditor({
   useEffect(() => {
     if (editor && pageNumber === 1) {
       onActivateEditor(editor);
+
+      let targetPos: number | null = null;
+      editor.state.doc.descendants((node, pos) => {
+        if (targetPos === null) {
+          if (node.type.name === 'listItem' || node.type.name === 'taskItem') {
+            targetPos = pos + 2;
+          } else if (node.type.name === 'paragraph' && pos > 0) {
+            targetPos = pos + 1;
+          }
+        }
+      });
+
+      if (targetPos !== null) {
+        editor.chain().focus().setTextSelection(targetPos).run();
+      } else {
+        editor.commands.focus('end');
+      }
     }
   }, [editor, onActivateEditor, pageNumber]);
 

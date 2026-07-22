@@ -76,8 +76,9 @@ export const defaultWorkspace: Workspace = {
     defaultTemplate: 'blank',
     defaultQuickCapture: 'thought',
     utilityPanelVisible: true,
-    focusMessage: '',
     transcriptionEnabled: true,
+    confirmQuit: 'ask',
+    selectedShape: 'rectangle',
   },
   focusByDate: {},
 };

@@ -6,6 +6,7 @@ import {
   Copy,
   FileText,
   Filter,
+  Folder as FolderIcon,
   Grid2X2,
   Heart,
   LayoutGrid,
@@ -19,18 +20,20 @@ import {
   Search,
   Trash2,
 } from 'lucide-react';
-import type { Note, NoteMode, Tag } from '../types';
+import type { Folder, Note, NoteMode, Tag } from '../types';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 interface NotesListProps {
   notes: Note[];
   tags: Tag[];
+  folders?: Folder[];
   activeNoteId: string;
   search: string;
   title: string;
   breadcrumb?: string;
   onSearchChange: (value: string) => void;
   onSelectNote: (id: string) => void;
+  onSelectFolder?: (folderId: string) => void;
   onCreateNote: (mode: NoteMode) => void;
   onOpenAudio?: () => void;
   viewMode: 'list' | 'grid';
@@ -64,12 +67,14 @@ const relativeDate = (timestamp: number) => {
 export function NotesList({
   notes,
   tags,
+  folders,
   activeNoteId,
   search,
   title,
   breadcrumb,
   onSearchChange,
   onSelectNote,
+  onSelectFolder,
   onCreateNote,
   onOpenAudio,
   viewMode,
@@ -89,6 +94,7 @@ export function NotesList({
   const [noteMenu, setNoteMenu] = useState<string | null>(null);
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const [sortMenuPlacement, setSortMenuPlacement] = useState<'up' | 'down'>('down');
   const [newNotePlacement, setNewNotePlacement] = useState<'up' | 'down'>('down');
   const [noteMenuPlacement, setNoteMenuPlacement] = useState<{
@@ -98,15 +104,50 @@ export function NotesList({
   const newNoteControlRef = useRef<HTMLDivElement>(null);
   const isTrash = title === 'Trash';
 
-  const handleTitleBarDoubleClick = (event: React.MouseEvent<HTMLElement>) => {
-    if ((event.target as HTMLElement).closest('button, input, select, a')) return;
-    if ('__TAURI_INTERNALS__' in window || '__TAURI__' in window)
-      void getCurrentWindow().toggleMaximize();
+  const handleNoteClick = (event: React.MouseEvent, noteId: string, index: number) => {
+    if (event.metaKey || event.ctrlKey) {
+      event.preventDefault();
+      setLastSelectedIndex(index);
+      setSelectedNoteIds((current) =>
+        current.includes(noteId) ? current.filter((id) => id !== noteId) : [...current, noteId],
+      );
+
+      return;
+    }
+
+    if (event.shiftKey && lastSelectedIndex !== null) {
+      event.preventDefault();
+      const start = Math.min(lastSelectedIndex, index);
+      const end = Math.max(lastSelectedIndex, index);
+      const rangeIds = notes.slice(start, end + 1).map((n) => n.id);
+
+      setSelectedNoteIds((current) => Array.from(new Set([...current, ...rangeIds])));
+
+      return;
+    }
+
+    setSelectedNoteIds([]);
+    setLastSelectedIndex(index);
+    onSelectNote(noteId);
   };
 
+  const [visibleCount, setVisibleCount] = useState(25);
+
   useEffect(() => {
+    setVisibleCount(25);
     setSelectedNoteIds([]);
-  }, [title, notes]);
+  }, [title, search, sort]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollHeight - scrollTop - clientHeight < 200) {
+      if (visibleCount < notes.length) {
+        setVisibleCount((prev) => Math.min(prev + 25, notes.length));
+      }
+    }
+  };
+
+  const visibleNotesSlice = notes.slice(0, visibleCount);
 
   useEffect(() => {
     if (!newNoteMenuOpen && !noteMenu && !sortMenuOpen) {
@@ -175,20 +216,19 @@ export function NotesList({
       <div
         className="notes-header-stack"
         data-tauri-drag-region
-        onDoubleClick={handleTitleBarDoubleClick}
       >
         {breadcrumb ? (
-          <div className="notes-breadcrumb-line">
-            <span>Projects</span>
-            <span className="separator">›</span>
-            <span className="current">{breadcrumb.split(' / ').pop()}</span>
+          <div className="notes-breadcrumb-line" data-tauri-drag-region>
+            <span data-tauri-drag-region>Projects</span>
+            <span className="separator" data-tauri-drag-region>›</span>
+            <span className="current" data-tauri-drag-region>{breadcrumb.split(' / ').pop()}</span>
           </div>
         ) : null}
 
-        <div className="notes-title-row">
-          <div className="notes-title-group">
-            <h2>{title}</h2>
-            <span className="notes-count-meta">
+        <div className="notes-title-row" data-tauri-drag-region>
+          <div className="notes-title-group" data-tauri-drag-region>
+            <h2 data-tauri-drag-region>{title}</h2>
+            <span className="notes-count-meta" data-tauri-drag-region>
               {notes.length} {notes.length === 1 ? 'note' : 'notes'}
             </span>
           </div>
@@ -370,10 +410,13 @@ export function NotesList({
         </div>
       ) : null}
 
-      <div className={`note-cards ${viewMode}`}>
-        {notes.map((note) => {
+      <div className={`note-cards ${viewMode}`} onScroll={handleScroll}>
+        {visibleNotesSlice.map((note, index) => {
           const noteColor = tags.find((tag) => note.tagIds.includes(tag.id))?.color ?? '#7f8998';
           const isSelected = selectedNoteIds.includes(note.id);
+          const folder = folders?.find((f) => f.id === note.folderId);
+          const folderName = folder ? folder.name : note.folderId === 'inbox' ? 'Inbox' : null;
+          const folderColor = folder?.color || '#4c9bff';
 
           return (
             <div
@@ -386,28 +429,15 @@ export function NotesList({
             >
               <button
                 className={`${note.id === activeNoteId ? 'note-card active' : 'note-card'}${isSelected ? ' selected-for-bulk' : ''}`}
-                onClick={(event) => {
-                  if (event.shiftKey || selectedNoteIds.length > 0) {
-                    event.preventDefault();
-                    toggleSelection(note.id);
-                    return;
-                  }
-                  setSelectedNoteIds([]);
-                  onSelectNote(note.id);
-                }}
+                onClick={(event) => handleNoteClick(event, note.id, index)}
                 style={{ '--note-color': noteColor } as React.CSSProperties}
               >
                 <span className="note-marker" />
-                <span
-                  className="note-select-indicator"
-                  aria-hidden="true"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleSelection(note.id);
-                  }}
-                >
-                  {isSelected ? <Check size={12} /> : null}
-                </span>
+                {isSelected ? (
+                  <span className="note-select-indicator" aria-hidden="true">
+                    <Check size={12} />
+                  </span>
+                ) : null}
                 <span className="note-card-content">
                   <span className="note-card-topline">
                     <strong>{note.title}</strong>
@@ -415,12 +445,30 @@ export function NotesList({
                   </span>
                   <p>{notePreview(note)}</p>
                   <small>
-                    {note.mode === 'document' ? <FileText size={10} /> : <Maximize2 size={10} />}
-                    {note.mode === 'document'
-                      ? `${note.pages.length} ${note.pages.length === 1 ? 'page' : 'pages'}`
-                      : 'Canvas'}
+                    {folderName ? (
+                      <span
+                        className="note-project-badge"
+                        style={{ '--project-color': folderColor } as React.CSSProperties}
+                        title={`View notes in ${folderName}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (note.folderId) {
+                            onSelectFolder?.(note.folderId);
+                          }
+                        }}
+                      >
+                        <FolderIcon size={10} />
+                        <span>{folderName}</span>
+                      </span>
+                    ) : null}
+                    <span className="note-meta-item">
+                      {note.mode === 'document' ? <FileText size={10} /> : <Maximize2 size={10} />}
+                      {note.mode === 'document'
+                        ? `${note.pages.length} ${note.pages.length === 1 ? 'page' : 'pages'}`
+                        : 'Canvas'}
+                    </span>
                     <span>·</span>
-                    {relativeDate(note.updatedAt)}
+                    <span className="note-meta-date">{relativeDate(note.updatedAt)}</span>
                   </small>
                 </span>
               </button>
@@ -487,6 +535,11 @@ export function NotesList({
             </div>
           );
         })}
+        {visibleCount < notes.length && (
+          <div className="notes-load-more-indicator">
+            <span>Showing {visibleNotesSlice.length} of {notes.length} notes (scroll to load more)</span>
+          </div>
+        )}
         {!notes.length ? (
           search ? (
             <div className="empty-notes">
