@@ -4,6 +4,7 @@ import {
   Circle,
   Diamond,
   Eraser,
+  Highlighter,
   Image,
   Minus,
   MousePointer2,
@@ -28,6 +29,7 @@ interface ToolDockProps {
 const canvasTools = [
   { id: 'text', label: 'Write', icon: Type },
   { id: 'pen', label: 'Draw', icon: PenLine },
+  { id: 'highlighter', label: 'Highlight', icon: Highlighter },
   { id: 'eraser', label: 'Erase', icon: Eraser },
   { id: 'shape', label: 'Shapes', icon: Square },
   { id: 'select', label: 'Move', icon: MousePointer2 },
@@ -35,7 +37,7 @@ const canvasTools = [
   { id: 'handwriting', label: 'Read ink', icon: ScanText },
 ] as const;
 
-const documentTools = canvasTools.slice(0, 3);
+const documentTools = canvasTools.slice(0, 4);
 
 const shapesList: Array<{ id: ShapeType; label: string; icon: typeof Square }> = [
   { id: 'rectangle', label: 'Rectangle', icon: Square },

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Check,
+  ChevronDown,
   ImagePlus,
   Layers2,
   LoaderCircle,
@@ -33,6 +34,7 @@ interface InfiniteCanvasProps {
   onChange: (note: Note) => void;
   onPenDetected: () => void;
   audioPlayer?: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 interface ScreenPoint {
@@ -192,6 +194,7 @@ export function InfiniteCanvas({
   onChange,
   onPenDetected,
   audioPlayer,
+  children,
 }: InfiniteCanvasProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -596,13 +599,17 @@ export function InfiniteCanvas({
       return;
     }
 
-    if (tool === 'pen') {
+    if (tool === 'pen' || tool === 'highlighter') {
+      const baseColor = settings.penColor.startsWith('#') ? settings.penColor : '#f19b3f';
+      const strokeColor = tool === 'highlighter' ? `${baseColor.slice(0, 7)}66` : settings.penColor;
+
       workingStroke.current = {
         id: makeId('stroke'),
         type: 'stroke',
         points: [worldPoint],
-        color: settings.penColor,
-        width: 3.2,
+        color: strokeColor,
+        width: tool === 'highlighter' ? 18 : 3.2,
+        isHighlighter: tool === 'highlighter',
         createdAt: Date.now(),
       };
       return;
@@ -912,19 +919,97 @@ export function InfiniteCanvas({
       onPointerCancel={handlePointerUp}
       onWheel={handleWheel}
     >
-      <div className="canvas-title-widget tinted-glass" onPointerDown={(e) => e.stopPropagation()}>
-        <input
-          className="canvas-title-input"
-          value={note.title}
-          onChange={(event) =>
-            onChange({ ...note, title: event.target.value, updatedAt: Date.now() })
-          }
-          placeholder="Untitled canvas"
-          aria-label="Canvas title"
-        />
-        <span className="canvas-mode-label">
-          <Maximize2 size={12} /> Infinite canvas
-        </span>
+      <div className="editor-banner-container" onPointerDown={(e) => e.stopPropagation()}>
+        <div className="editor-title-row">
+          <input
+            className="document-inline-title"
+            value={note.title}
+            onChange={(event) =>
+              onChange({ ...note, title: event.target.value, updatedAt: Date.now() })
+            }
+            placeholder="Untitled canvas"
+            aria-label="Canvas title"
+          />
+          <div className="document-mode-label">
+            <Maximize2 size={14} /> Infinite canvas
+          </div>
+        </div>
+
+        <div className="editor-full-toolbar">
+          <div className="toolbar-left-group">{children}</div>
+          <div className="toolbar-right-group">
+            <div className="document-format-bar">
+              <button
+                onClick={handleUndo}
+                disabled={!undoStack.length}
+                aria-label="Undo"
+                title="Undo (⌘Z)"
+              >
+                <Undo2 size={16} />
+              </button>
+              <button
+                onClick={handleRedo}
+                disabled={!redoStack.length}
+                aria-label="Redo"
+                title="Redo (⌘⇧Z)"
+              >
+                <Redo2 size={16} />
+              </button>
+            </div>
+
+            <div className="document-paper-control">
+              <button
+                className={backgroundOpen ? 'active' : ''}
+                onClick={() => setBackgroundOpen((open) => !open)}
+              >
+                <Layers2 size={14} />
+                Background
+                <ChevronDown size={14} />
+              </button>
+              {backgroundOpen ? (
+                <div className="paper-menu">
+                  <p>Paper</p>
+                  <div className="paper-color-row">
+                    {canvasColors.map((color) => (
+                      <button
+                        key={color}
+                        className={note.canvasColor === color ? 'active' : ''}
+                        style={{ backgroundColor: color }}
+                        onClick={() => updateSurface({ canvasColor: color })}
+                        aria-label={`Canvas color ${color}`}
+                      >
+                        {note.canvasColor === color ? <Check size={12} /> : null}
+                      </button>
+                    ))}
+                  </div>
+                  <p>Layout</p>
+                  <div className="paper-pattern-row">
+                    {canvasPatterns.map((pattern) => (
+                      <button
+                        key={pattern.id}
+                        className={note.canvasPattern === pattern.id ? 'active' : ''}
+                        onClick={() => updateSurface({ canvasPattern: pattern.id })}
+                      >
+                        <span className={`pattern-preview ${pattern.id}`} />
+                        {pattern.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="document-zoom-control">
+              <button onClick={() => setZoom(camera.zoom - 0.1)} aria-label="Zoom out">
+                <Minus size={14} />
+              </button>
+              <button onClick={() => setZoom(1)}>{Math.round(camera.zoom * 100)}%</button>
+              <button onClick={() => setZoom(camera.zoom + 0.1)} aria-label="Zoom in">
+                <Plus size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
       {audioPlayer}
       <canvas ref={canvasRef} />
@@ -974,73 +1059,7 @@ export function InfiniteCanvas({
         <span ref={pressureLabelRef}>Pressure 0%</span>
       </div>
 
-      <div className="canvas-controls" onPointerDown={(event) => event.stopPropagation()}>
-        <button
-          onClick={handleUndo}
-          disabled={!undoStack.length}
-          aria-label="Undo"
-          title="Undo (⌘Z)"
-        >
-          <Undo2 size={14} />
-        </button>
-        <button
-          onClick={handleRedo}
-          disabled={!redoStack.length}
-          aria-label="Redo"
-          title="Redo (⌘⇧Z)"
-        >
-          <Redo2 size={14} />
-        </button>
-        <button
-          className={backgroundOpen ? 'background-button active' : 'background-button'}
-          onClick={() => setBackgroundOpen((open) => !open)}
-          aria-label="Canvas background"
-        >
-          <Layers2 size={14} />
-          Background
-        </button>
-        <div className="zoom-control">
-          <button onClick={() => setZoom(camera.zoom - 0.1)} aria-label="Zoom out">
-            <Minus size={14} />
-          </button>
-          <button onClick={() => setZoom(1)}>{Math.round(camera.zoom * 100)}%</button>
-          <button onClick={() => setZoom(camera.zoom + 0.1)} aria-label="Zoom in">
-            <Plus size={14} />
-          </button>
-        </div>
-      </div>
 
-      {backgroundOpen ? (
-        <div className="background-popover" onPointerDown={(event) => event.stopPropagation()}>
-          <span className="popover-label">Surface</span>
-          <div className="background-colors">
-            {canvasColors.map((color) => (
-              <button
-                key={color}
-                className={note.canvasColor === color ? 'active' : ''}
-                style={{ background: color }}
-                onClick={() => updateSurface({ canvasColor: color })}
-                aria-label={`Canvas color ${color}`}
-              >
-                {note.canvasColor === color ? <Check size={12} /> : null}
-              </button>
-            ))}
-          </div>
-          <span className="popover-label">Pattern</span>
-          <div className="background-patterns">
-            {canvasPatterns.map((pattern) => (
-              <button
-                key={pattern.id}
-                className={note.canvasPattern === pattern.id ? 'active' : ''}
-                onClick={() => updateSurface({ canvasPattern: pattern.id })}
-              >
-                <span className={`pattern-preview ${pattern.id}`} />
-                {pattern.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
 
       {tool === 'image' ? (
         <div className="canvas-hint">
@@ -1195,11 +1214,18 @@ function drawStroke(context: CanvasRenderingContext2D, stroke: InkStroke, pressu
   }
 
   context.save();
-  context.strokeStyle = stroke.color;
-  context.lineCap = 'round';
-  context.lineJoin = 'round';
+  if (stroke.isHighlighter) {
+    context.globalCompositeOperation = 'multiply';
+    context.strokeStyle = stroke.color;
+    context.lineCap = 'square';
+    context.lineJoin = 'miter';
+  } else {
+    context.strokeStyle = stroke.color;
+    context.lineCap = 'round';
+    context.lineJoin = 'round';
+  }
 
-  if (!pressureWidth) {
+  if (!pressureWidth || stroke.isHighlighter) {
     context.lineWidth = stroke.width;
     context.beginPath();
     context.moveTo(stroke.points[0].x, stroke.points[0].y);

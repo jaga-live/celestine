@@ -1,4 +1,4 @@
-export type Tool = 'select' | 'pen' | 'eraser' | 'text' | 'shape' | 'image' | 'handwriting';
+export type Tool = 'select' | 'pen' | 'highlighter' | 'eraser' | 'text' | 'shape' | 'image' | 'handwriting';
 export type Theme = 'dark' | 'light';
 export type HandwritingConversion = 'manual' | 'after-delay';
 export type HandwritingFont = 'chalkboard' | 'noteworthy' | 'bradley-hand';
@@ -22,6 +22,7 @@ export interface InkStroke {
   points: Point[];
   color: string;
   width: number;
+  isHighlighter?: boolean;
   createdAt: number;
 }
 
@@ -82,13 +83,12 @@ export interface Note {
   title: string;
   mode: NoteMode;
   folderId: string;
-  tagIds: string[];
+  tagIds?: string[];
   favorite: boolean;
   updatedAt: number;
   createdAt?: number;
   openedAt?: number;
   openCount?: number;
-  archived?: boolean;
   deletedAt?: number;
   captureKind?: 'quick' | 'audio' | 'drawing' | 'standard';
   audioDataUrl?: string;
@@ -158,7 +158,7 @@ export interface FocusItem {
 export interface Workspace {
   version: number;
   folders: Folder[];
-  tags: Tag[];
+  tags?: Tag[];
   notes: Note[];
   activeNoteId: string;
   settings: Settings;

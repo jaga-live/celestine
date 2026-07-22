@@ -32,22 +32,7 @@ interface TextCardProps {
   onDelete: () => void;
 }
 
-const PALETTE_COLORS = [
-  { id: 'default', label: 'Default', value: '' },
-  { id: 'white', label: 'White', value: '#ffffff' },
-  { id: 'muted', label: 'Muted', value: '#94a3b8' },
-  { id: 'red', label: 'Red', value: '#ff5c5c' },
-  { id: 'crimson', label: 'Crimson', value: '#e63946' },
-  { id: 'orange', label: 'Orange', value: '#ff8c38' },
-  { id: 'gold', label: 'Gold', value: '#ffd166' },
-  { id: 'yellow', label: 'Yellow', value: '#fee440' },
-  { id: 'mint', label: 'Mint', value: '#2ec4b6' },
-  { id: 'sky', label: 'Sky', value: '#3a86ff' },
-  { id: 'indigo', label: 'Indigo', value: '#4361ee' },
-  { id: 'purple', label: 'Purple', value: '#8a2be2' },
-  { id: 'pink', label: 'Pink', value: '#ff70a6' },
-  { id: 'magenta', label: 'Magenta', value: '#f72585' },
-];
+import { ColorPalette } from './ui/ColorPalette';
 
 export function TextCard({
   object,
@@ -57,7 +42,7 @@ export function TextCard({
   onChange,
   onDelete,
 }: TextCardProps) {
-  const [colorMenuOpen, setColorMenuOpen] = useState(false);
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -135,50 +120,15 @@ export function TextCard({
             <option value="26px">26px</option>
             <option value="34px">34px</option>
           </select>
-          <button
-            className={colorMenuOpen ? 'active' : ''}
-            onClick={() => setColorMenuOpen((open) => !open)}
-            aria-label="Color palette"
-            title="Text Color"
-          >
-            <Palette size={14} />
-          </button>
-          {colorMenuOpen ? (
-            <div className="text-color-palette">
-              <div className="swatch-grid">
-                {PALETTE_COLORS.map((c) => (
-                  <button
-                    key={c.id}
-                    className="swatch-item"
-                    style={{ backgroundColor: c.value || '#e2e8f0' }}
-                    title={c.label}
-                    onClick={() => {
-                      if (c.value) {
-                        editor.chain().focus().setMark('textStyle', { color: c.value }).run();
-                      } else {
-                        editor.chain().focus().setMark('textStyle', { color: null }).run();
-                      }
-                      setColorMenuOpen(false);
-                    }}
-                  />
-                ))}
-              </div>
-              <label className="custom-color-row">
-                <span>Custom</span>
-                <input
-                  type="color"
-                  onChange={(event) => {
-                    editor
-                      .chain()
-                      .focus()
-                      .setMark('textStyle', { color: event.target.value })
-                      .run();
-                    setColorMenuOpen(false);
-                  }}
-                />
-              </label>
-            </div>
-          ) : null}
+          <ColorPalette
+            onColorSelect={(color) => {
+              if (color) {
+                editor.chain().focus().setMark('textStyle', { color }).run();
+              } else {
+                editor.chain().focus().setMark('textStyle', { color: null }).run();
+              }
+            }}
+          />
           <button
             className={editor.isActive('bold') ? 'active' : ''}
             onClick={() => editor.chain().focus().toggleBold().run()}

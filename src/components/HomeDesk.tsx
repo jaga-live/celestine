@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDown,
   ArrowRight,
@@ -51,19 +51,40 @@ interface HomeDeskProps {
   onMoveFocus: (id: string, direction: -1 | 1) => void;
 }
 
+const notePreviewCache = new WeakMap<Note, string>();
+
 const stripHtml = (html: string) =>
   html
     .replace(/<[^>]*>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-const notePreview = (note: Note) =>
-  note.mode === 'document'
-    ? stripHtml(note.pages.map((page) => page.html).join(' ')).slice(0, 150)
-    : note.objects.find((item) => item.type === 'text' && stripHtml(item.html))?.type === 'text'
-      ? stripHtml(
-          (note.objects.find((item) => item.type === 'text') as { html: string }).html,
-        ).slice(0, 150)
-      : `${note.objects.filter((item) => item.type === 'stroke').length} ink strokes`;
+
+const notePreview = (note: Note): string => {
+  const cached = notePreviewCache.get(note);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  let text = '';
+  if (note.mode === 'document') {
+    text = stripHtml(note.pages.map((page) => page.html).join(' ')).slice(0, 150);
+  } else {
+    const textObj = note.objects.find(
+      (item) => item.type === 'text' && (item as { html?: string }).html,
+    ) as { html: string } | undefined;
+
+    if (textObj && textObj.html) {
+      text = stripHtml(textObj.html).slice(0, 150);
+    } else {
+      text = `${note.objects.filter((item) => item.type === 'stroke').length} ink strokes`;
+    }
+  }
+
+  notePreviewCache.set(note, text);
+
+  return text;
+};
+
 const relativeTime = (timestamp: number) => {
   const minutes = Math.max(1, Math.round((Date.now() - timestamp) / 60_000));
   if (minutes < 60) return `${minutes}m ago`;
@@ -86,7 +107,7 @@ interface HomeInsightsProps {
   onAddFocus: () => void;
 }
 
-function HomeInsights({
+const HomeInsights = React.memo(function HomeInsights({
   focusItems,
   completed,
   activeStreak,
@@ -205,7 +226,7 @@ function HomeInsights({
       </section>
     </section>
   );
-}
+});
 
 export function HomeDesk({
   notes,
@@ -232,10 +253,7 @@ export function HomeDesk({
   const [newMenuPlacement, setNewMenuPlacement] = useState<'up' | 'down'>('down');
   const current = new Date();
   const recent = useMemo(
-    () =>
-      [...notes]
-        .filter((note) => !note.archived && !note.deletedAt)
-        .sort((a, b) => b.updatedAt - a.updatedAt),
+    () => [...notes].filter((note) => !note.deletedAt).sort((a, b) => b.updatedAt - a.updatedAt),
     [notes],
   );
   const hour = current.getHours();

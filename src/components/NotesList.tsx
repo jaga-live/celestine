@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  Archive,
   Check,
   ChevronDown,
   Copy,
@@ -9,7 +8,6 @@ import {
   Folder as FolderIcon,
   Grid2X2,
   Heart,
-  LayoutGrid,
   List,
   Maximize2,
   Mic,
@@ -20,12 +18,10 @@ import {
   Search,
   Trash2,
 } from 'lucide-react';
-import type { CelestineTemplate, Folder, Note, NoteMode, Tag } from '../types';
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import type { CelestineTemplate, Folder, Note, NoteMode } from '../types';
 
 interface NotesListProps {
   notes: Note[];
-  tags: Tag[];
   folders?: Folder[];
   activeNoteId: string;
   search: string;
@@ -41,7 +37,6 @@ interface NotesListProps {
   onViewModeChange: (value: 'list' | 'grid') => void;
   onSortChange: (value: 'updated' | 'created' | 'title') => void;
   onDuplicate: (id: string) => void;
-  onArchive: (id: string) => void;
   onTrash: (id: string) => void;
   onRestore: (id: string) => void;
   onDeleteForever: (id: string) => void;
@@ -66,7 +61,6 @@ const relativeDate = (timestamp: number) => {
 
 export function NotesList({
   notes,
-  tags,
   folders,
   activeNoteId,
   search,
@@ -82,7 +76,6 @@ export function NotesList({
   onViewModeChange,
   onSortChange,
   onDuplicate,
-  onArchive,
   onTrash,
   onRestore,
   onDeleteForever,
@@ -138,13 +131,23 @@ export function NotesList({
     setSelectedNoteIds([]);
   }, [title, search, sort]);
 
+  const scrollRafId = useRef<number | null>(null);
+
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-    if (scrollHeight - scrollTop - clientHeight < 200) {
-      if (visibleCount < notes.length) {
-        setVisibleCount((prev) => Math.min(prev + 25, notes.length));
-      }
+    const target = e.currentTarget;
+    if (scrollRafId.current !== null) {
+      return;
     }
+
+    scrollRafId.current = requestAnimationFrame(() => {
+      scrollRafId.current = null;
+      const { scrollTop, scrollHeight, clientHeight } = target;
+      if (scrollHeight - scrollTop - clientHeight < 250) {
+        if (visibleCount < notes.length) {
+          setVisibleCount((prev) => Math.min(prev + 30, notes.length));
+        }
+      }
+    });
   };
 
   const visibleNotesSlice = notes.slice(0, visibleCount);
@@ -279,7 +282,11 @@ export function NotesList({
                 </button>
                 <button
                   onClick={() => {
-                    onCreateNote('document', 'audio');
+                    if (onOpenAudio) {
+                      onOpenAudio();
+                    } else {
+                      onCreateNote('document', 'audio');
+                    }
                     setNewNoteMenuOpen(false);
                   }}
                 >
@@ -352,26 +359,7 @@ export function NotesList({
               ) : null}
             </div>
 
-            <button className="icon-btn-square" title="Filter notes" aria-label="Filter notes">
-              <Filter size={14} />
-            </button>
 
-            <div className="view-mode-toggle-group">
-              <button
-                className={viewMode === 'list' ? 'active' : ''}
-                onClick={() => onViewModeChange('list')}
-                aria-label="List view"
-              >
-                <List size={14} />
-              </button>
-              <button
-                className={viewMode === 'grid' ? 'active' : ''}
-                onClick={() => onViewModeChange('grid')}
-                aria-label="Grid view"
-              >
-                <Grid2X2 size={14} />
-              </button>
-            </div>
           </div>
         </div>
       </div>
@@ -425,7 +413,7 @@ export function NotesList({
 
       <div className={`note-cards ${viewMode}`} onScroll={handleScroll}>
         {visibleNotesSlice.map((note, index) => {
-          const noteColor = tags.find((tag) => note.tagIds.includes(tag.id))?.color ?? '#7f8998';
+          const noteColor = '#7f8998';
           const isSelected = selectedNoteIds.includes(note.id);
           const folder = folders?.find((f) => f.id === note.folderId);
           const folderName = folder ? folder.name : note.folderId === 'inbox' ? 'Inbox' : null;
@@ -524,24 +512,14 @@ export function NotesList({
                       </button>
                     </>
                   ) : (
-                    <>
-                      <button
-                        onClick={() => {
-                          onArchive(note.id);
-                          setNoteMenu(null);
-                        }}
-                      >
-                        <Archive size={13} /> {note.archived ? 'Unarchive' : 'Archive'}
-                      </button>
-                      <button
-                        onClick={() => {
-                          onTrash(note.id);
-                          setNoteMenu(null);
-                        }}
-                      >
-                        <Trash2 size={13} /> Move to trash
-                      </button>
-                    </>
+                    <button
+                      onClick={() => {
+                        onTrash(note.id);
+                        setNoteMenu(null);
+                      }}
+                    >
+                      <Trash2 size={13} /> Move to trash
+                    </button>
                   )}
                 </div>
               ) : null}
@@ -601,23 +579,6 @@ export function NotesList({
               <p className="empty-space-desc">
                 {title} is empty. Capture ideas, plans, and milestones to keep your vision on track.
               </p>
-              <div
-                className="empty-space-actions"
-                style={{ marginTop: '16px', justifyContent: 'center' }}
-              >
-                <button className="btn-secondary-flat" onClick={() => onCreateNote('document')}>
-                  <FileText size={14} /> + Note
-                </button>
-                <button className="btn-secondary-flat" onClick={() => onCreateNote('canvas')}>
-                  <PenLine size={14} /> + Canvas
-                </button>
-                <button
-                  className="btn-secondary-flat"
-                  onClick={() => onCreateNote('document', 'audio')}
-                >
-                  <Mic size={14} /> + Audio note
-                </button>
-              </div>
             </div>
           )
         ) : null}

@@ -28,22 +28,7 @@ import type { CanvasPattern, DocumentPage, InkStroke, Note, Point, Settings, Too
 import { RichTextSlashMenu } from './RichTextSlashMenu';
 import { TextStyleMark } from '../lib/tiptapTextStyle';
 
-const PALETTE_COLORS = [
-  { id: 'default', label: 'Default', value: '' },
-  { id: 'white', label: 'White', value: '#ffffff' },
-  { id: 'muted', label: 'Muted', value: '#94a3b8' },
-  { id: 'red', label: 'Red', value: '#ff5c5c' },
-  { id: 'crimson', label: 'Crimson', value: '#e63946' },
-  { id: 'orange', label: 'Orange', value: '#ff8c38' },
-  { id: 'gold', label: 'Gold', value: '#ffd166' },
-  { id: 'yellow', label: 'Yellow', value: '#fee440' },
-  { id: 'mint', label: 'Mint', value: '#2ec4b6' },
-  { id: 'sky', label: 'Sky', value: '#3a86ff' },
-  { id: 'indigo', label: 'Indigo', value: '#4361ee' },
-  { id: 'purple', label: 'Purple', value: '#8a2be2' },
-  { id: 'pink', label: 'Pink', value: '#ff70a6' },
-  { id: 'magenta', label: 'Magenta', value: '#f72585' },
-];
+import { ColorPalette } from './ui/ColorPalette';
 
 interface DocumentEditorProps {
   note: Note;
@@ -100,7 +85,7 @@ export function DocumentEditor({
 }: DocumentEditorProps) {
   const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
   const [paperMenuOpen, setPaperMenuOpen] = useState(false);
-  const [colorMenuOpen, setColorMenuOpen] = useState(false);
+
   const [documentZoom, setDocumentZoom] = useState(1.28);
   const wordCount = useMemo(() => {
     const text = note.pages.map((p) => p.html.replace(/<[^>]*>/g, ' ')).join(' ');
@@ -223,61 +208,18 @@ export function DocumentEditor({
                 <option value="26px">26px</option>
                 <option value="34px">34px</option>
               </select>
-              <div className="color-palette-container">
-                <button
-                  className={colorMenuOpen ? 'active' : ''}
-                  disabled={!activeEditor}
-                  onClick={() => setColorMenuOpen((open) => !open)}
-                  aria-label="Color palette"
-                  title="Text color"
-                >
-                  <Palette size={16} />
-                </button>
-                {colorMenuOpen && activeEditor ? (
-                  <div className="text-color-palette tinted-glass">
-                    <div className="swatch-grid">
-                      {PALETTE_COLORS.map((c) => (
-                        <button
-                          key={c.id}
-                          className="swatch-item"
-                          style={{ backgroundColor: c.value || '#e2e8f0' }}
-                          title={c.label}
-                          onClick={() => {
-                            if (c.value) {
-                              activeEditor
-                                .chain()
-                                .focus()
-                                .setMark('textStyle', { color: c.value })
-                                .run();
-                            } else {
-                              activeEditor
-                                .chain()
-                                .focus()
-                                .setMark('textStyle', { color: null })
-                                .run();
-                            }
-                            setColorMenuOpen(false);
-                          }}
-                        />
-                      ))}
-                    </div>
-                    <label className="custom-color-row">
-                      <span>Custom</span>
-                      <input
-                        type="color"
-                        onChange={(event) => {
-                          activeEditor
-                            .chain()
-                            .focus()
-                            .setMark('textStyle', { color: event.target.value })
-                            .run();
-                          setColorMenuOpen(false);
-                        }}
-                      />
-                    </label>
-                  </div>
-                ) : null}
-              </div>
+              <ColorPalette
+                disabled={!activeEditor}
+                iconSize={16}
+                onColorSelect={(color) => {
+                  if (!activeEditor) return;
+                  if (color) {
+                    activeEditor.chain().focus().setMark('textStyle', { color }).run();
+                  } else {
+                    activeEditor.chain().focus().setMark('textStyle', { color: null }).run();
+                  }
+                }}
+              />
               <span />
               {formatButton(
                 'Bold',
@@ -609,7 +551,7 @@ function DocumentInkLayer({
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (tool !== 'pen' && tool !== 'eraser') {
+    if (tool !== 'pen' && tool !== 'highlighter' && tool !== 'eraser') {
       return;
     }
 
@@ -621,12 +563,16 @@ function DocumentInkLayer({
       return;
     }
 
+    const baseColor = settings.penColor.startsWith('#') ? settings.penColor : '#f19b3f';
+    const strokeColor = tool === 'highlighter' ? `${baseColor.slice(0, 7)}66` : settings.penColor;
+
     workingStroke.current = {
       id: makeId('stroke'),
       type: 'stroke',
       points: [point],
-      color: settings.penColor,
-      width: 3.2,
+      color: strokeColor,
+      width: tool === 'highlighter' ? 18 : 3.2,
+      isHighlighter: tool === 'highlighter',
       createdAt: Date.now(),
     };
   };
@@ -711,16 +657,27 @@ function drawStroke(context: CanvasRenderingContext2D, stroke: InkStroke, pressu
   }
 
   context.save();
-  context.strokeStyle = stroke.color;
-  context.lineCap = 'round';
-  context.lineJoin = 'round';
+  if (stroke.isHighlighter) {
+    context.globalCompositeOperation = 'multiply';
+    context.strokeStyle = stroke.color;
+    context.lineCap = 'square';
+    context.lineJoin = 'miter';
+  } else {
+    context.strokeStyle = stroke.color;
+    context.lineCap = 'round';
+    context.lineJoin = 'round';
+  }
 
   for (let index = 1; index < stroke.points.length; index += 1) {
     const previous = stroke.points[index - 1];
     const current = stroke.points[index];
-    const pressure = pressureWidth ? (previous.pressure + current.pressure) / 2 : 0.5;
+    const pressure = stroke.isHighlighter
+      ? 0.5
+      : pressureWidth
+        ? (previous.pressure + current.pressure) / 2
+        : 0.5;
 
-    context.lineWidth = stroke.width * (0.45 + pressure * 1.2);
+    context.lineWidth = stroke.isHighlighter ? stroke.width : stroke.width * (0.45 + pressure * 1.2);
     context.beginPath();
     context.moveTo(previous.x, previous.y);
     context.lineTo(current.x, current.y);

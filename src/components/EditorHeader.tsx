@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  Archive,
   Copy,
   Download,
   FileText,
@@ -28,7 +27,6 @@ interface EditorHeaderProps {
   onDelete: () => void;
   onOpenSettings: () => void;
   onDuplicate: () => void;
-  onArchive: () => void;
   onSaveTemplate: () => void;
   folders: Folder[];
   onMove: (folderId: string) => void;
@@ -46,7 +44,6 @@ export function EditorHeader({
   onDelete,
   onOpenSettings,
   onDuplicate,
-  onArchive,
   onSaveTemplate,
   folders,
   onMove,
@@ -58,59 +55,83 @@ export function EditorHeader({
         <button
           className="icon-button"
           onClick={onToggleLibrary}
-          aria-label={libraryVisible ? 'Hide library' : 'Show library'}
+          aria-label={libraryVisible ? 'Hide library sidebar' : 'Show library sidebar'}
+          title={libraryVisible ? 'Hide library sidebar' : 'Show library sidebar'}
         >
           {libraryVisible ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
         </button>
+        <input
+          className="editor-title-input"
+          value={note.title}
+          onChange={(event) => onTitleChange(event.target.value)}
+          placeholder="Untitled note"
+        />
       </div>
-      <div className="header-actions">
+      <div className="editor-actions">
         <select
           className="note-space-select"
-          aria-label="Move note to space"
           value={note.folderId}
-          onChange={(event) => onMove(event.target.value)}
+          onChange={(e) => onMove(e.target.value)}
+          aria-label="Move note to space"
+          title="Move note to space"
         >
-          {folders.map((folder) => (
-            <option key={folder.id} value={folder.id}>
-              {folder.name}
+          {folders.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.name}
             </option>
           ))}
         </select>
-        <span className={`save-status ${saveState}`}>
-          <span />
-          {saveState === 'saving'
-            ? 'Saving'
-            : saveState === 'failed'
-              ? 'Save failed'
-              : 'Saved locally'}
-        </span>
         <button
-          className={note.favorite ? 'icon-button favorite' : 'icon-button'}
+          className={note.favorite ? 'icon-button active' : 'icon-button'}
           onClick={onToggleFavorite}
-          aria-label="Toggle favorite"
+          aria-label={note.favorite ? 'Remove from favorites' : 'Add to favorites'}
+          title={note.favorite ? 'Remove from favorites' : 'Add to favorites'}
         >
-          <Heart size={18} fill={note.favorite ? 'currentColor' : 'none'} />
+          <Heart size={16} fill={note.favorite ? 'currentColor' : 'none'} />
         </button>
         <button
           className="icon-button"
           onClick={onExport}
-          aria-label="Export Markdown"
-          title="Export"
+          aria-label="Export note"
+          title="Export note"
         >
-          <Download size={18} />
+          <Download size={16} />
+        </button>
+        <button
+          className="icon-button"
+          onClick={() => {
+            try {
+              getCurrentWindow()
+                .toggleMaximize()
+                .catch(() => {});
+            } catch {
+              // Ignore
+            }
+          }}
+          aria-label="Toggle full screen"
+          title="Toggle full screen"
+        >
+          <Maximize2 size={16} />
         </button>
         <div style={{ position: 'relative' }}>
           <button
-            className={`icon-button ${moreMenuOpen ? 'active' : ''}`}
+            className="icon-button"
             onClick={() => setMoreMenuOpen(!moreMenuOpen)}
             aria-label="More options"
+            title="More options"
           >
-            <MoreHorizontal size={18} />
+            <MoreHorizontal size={16} />
           </button>
-          {moreMenuOpen && (
+          {moreMenuOpen ? (
             <div
-              className="paper-menu"
-              style={{ right: 0, top: '44px', width: '200px', zIndex: 100 }}
+              className="note-context-menu"
+              style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '4px',
+                zIndex: 100,
+              }}
             >
               <button
                 className="icon-button"
@@ -126,22 +147,6 @@ export function EditorHeader({
                 }}
               >
                 <Copy size={16} style={{ marginRight: '8px' }} /> Duplicate
-              </button>
-              <button
-                className="icon-button"
-                style={{
-                  width: '100%',
-                  justifyContent: 'flex-start',
-                  padding: '8px',
-                  fontSize: '12px',
-                }}
-                onClick={() => {
-                  onArchive();
-                  setMoreMenuOpen(false);
-                }}
-              >
-                <Archive size={16} style={{ marginRight: '8px' }} />{' '}
-                {note.archived ? 'Unarchive' : 'Archive'}
               </button>
               <button
                 className="icon-button"
@@ -176,7 +181,7 @@ export function EditorHeader({
                 <Trash2 size={16} style={{ marginRight: '8px' }} /> Delete Note
               </button>
             </div>
-          )}
+          ) : null}
         </div>
         <button className="icon-button" onClick={onOpenSettings} aria-label="Open settings">
           <Settings2 size={18} />

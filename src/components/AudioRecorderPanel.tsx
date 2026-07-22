@@ -16,15 +16,15 @@ export function AudioRecorderPanel({
   const recorder = useRef<MediaRecorder | null>(null);
   const stream = useRef<MediaStream | null>(null);
   const chunks = useRef<Blob[]>([]);
-  const [state, setState] = useState<'requesting' | 'recording' | 'paused' | 'ready' | 'error'>(
-    'requesting',
+  const [state, setState] = useState<'idle' | 'requesting' | 'recording' | 'paused' | 'ready' | 'error'>(
+    'idle',
   );
   const [seconds, setSeconds] = useState(0);
   const [audioUrl, setAudioUrl] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
 
-  useEffect(() => {
+  const startRecording = () => {
     setState('requesting');
     setErrorMessage('');
     chunks.current = [];
@@ -45,6 +45,7 @@ export function AudioRecorderPanel({
       );
       setState('error');
     }, 15000);
+
     navigator.mediaDevices
       .getUserMedia({ audio: true })
       .then((mediaStream) => {
@@ -102,11 +103,12 @@ export function AudioRecorderPanel({
         );
         setState('error');
       });
-    return () => {
-      requestExpired = true;
-      window.clearTimeout(permissionTimeout);
-      stream.current?.getTracks().forEach((track) => track.stop());
-    };
+  };
+
+  useEffect(() => {
+    if (attempt > 0) {
+      startRecording();
+    }
   }, [attempt]);
 
   useEffect(() => {
@@ -190,20 +192,27 @@ export function AudioRecorderPanel({
               {String(seconds % 60).padStart(2, '0')}
             </strong>
             <p>
-              {state === 'requesting'
-                ? 'Requesting microphone access from macOS…'
-                : state === 'ready'
-                  ? 'Recording is ready to save.'
-                  : state === 'paused'
-                    ? 'Recording paused'
-                    : 'Recording locally'}
+              {state === 'idle'
+                ? 'Ready to record audio note.'
+                : state === 'requesting'
+                  ? 'Requesting microphone access from macOS…'
+                  : state === 'ready'
+                    ? 'Recording is ready to save.'
+                    : state === 'paused'
+                      ? 'Recording paused'
+                      : 'Recording locally'}
             </p>
-            {state !== 'requesting' ? (
+            {state !== 'requesting' && state !== 'idle' ? (
               <div className="live-transcript" aria-live="polite">
                 <small>{transcriptionCopy}</small>
               </div>
             ) : null}
             <div className="recorder-actions">
+              {state === 'idle' ? (
+                <button className="save-recording" onClick={startRecording}>
+                  <Mic size={16} /> Start recording
+                </button>
+              ) : null}
               {state === 'recording' || state === 'paused' ? (
                 <>
                   <button onClick={togglePause}>

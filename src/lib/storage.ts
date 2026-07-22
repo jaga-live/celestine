@@ -68,7 +68,7 @@ const migrateWorkspace = (workspace: Workspace): Workspace => {
       parentId: folder.parentId,
       color: legacyColors[folder.color] ?? folder.color,
     })),
-    tags: workspace.tags.map((tag) => ({
+    tags: (workspace.tags ?? []).map((tag) => ({
       ...tag,
       color: legacyColors[tag.color] ?? tag.color,
     })),
@@ -78,7 +78,6 @@ const migrateWorkspace = (workspace: Workspace): Workspace => {
       createdAt: note.createdAt ?? note.updatedAt,
       openedAt: note.openedAt ?? note.updatedAt,
       openCount: note.openCount ?? 0,
-      archived: note.archived ?? false,
       deletedAt: note.deletedAt,
       attachments: note.attachments ?? [],
       captureKind: note.captureKind ?? 'standard',

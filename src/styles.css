@@ -2648,6 +2648,7 @@ kbd {
 }
 
 .document-ink-layer.tool-pen .document-live-ink,
+.document-ink-layer.tool-highlighter .document-live-ink,
 .document-ink-layer.tool-eraser .document-live-ink {
   pointer-events: auto;
   touch-action: none;
@@ -2657,8 +2658,12 @@ kbd {
   cursor: crosshair;
 }
 
+.document-ink-layer.tool-highlighter .document-live-ink {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='rgba(241,155,63,0.3)' stroke='%23f19b3f' stroke-width='1.5'/%3E%3C/svg%3E") 12 12, crosshair;
+}
+
 .document-ink-layer.tool-eraser .document-live-ink {
-  cursor: cell;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='rgba(255,255,255,0.15)' stroke='%23ffffff' stroke-width='1.5'/%3E%3Ccircle cx='12' cy='12' r='2' fill='%23ffffff'/%3E%3C/svg%3E") 12 12, cell;
 }
 
 .editor-banner-container {
@@ -3123,8 +3128,12 @@ kbd {
   cursor: crosshair;
 }
 
+.infinite-canvas.tool-highlighter {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='rgba(241,155,63,0.3)' stroke='%23f19b3f' stroke-width='1.5'/%3E%3C/svg%3E") 12 12, crosshair;
+}
+
 .infinite-canvas.tool-eraser {
-  cursor: cell;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='rgba(255,255,255,0.15)' stroke='%23ffffff' stroke-width='1.5'/%3E%3Ccircle cx='12' cy='12' r='2' fill='%23ffffff'/%3E%3C/svg%3E") 12 12, cell;
 }
 
 .infinite-canvas.is-panning {

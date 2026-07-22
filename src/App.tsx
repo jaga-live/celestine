@@ -61,8 +61,7 @@ export default function App() {
     },
   );
 
-  const getFilterKey = (f: LibraryFilter) =>
-    `${f.type}-${f.type === 'folder' || f.type === 'tag' ? f.id : ''}`;
+  const getFilterKey = (f: LibraryFilter) => `${f.type}-${f.type === 'folder' ? f.id : ''}`;
 
   const noteSort = useMemo(() => {
     const key = getFilterKey(filter);
@@ -295,12 +294,8 @@ export default function App() {
     return workspace.notes
       .filter((note) => {
         if (filter.type !== 'trash' && note.deletedAt) return false;
-        if (!['archive', 'trash'].includes(filter.type) && note.archived) return false;
         if (filter.type === 'favorites') {
-          return note.favorite && !note.deletedAt && !note.archived;
-        }
-        if (filter.type === 'archive') {
-          return note.archived && !note.deletedAt;
+          return note.favorite && !note.deletedAt;
         }
         if (filter.type === 'trash') {
           return Boolean(note.deletedAt);
@@ -313,21 +308,14 @@ export default function App() {
           return note.folderId === filter.id || nestedFolderIds.includes(note.folderId);
         }
 
-        if (filter.type === 'tag') {
-          return note.tagIds.includes(filter.id);
-        }
-
-        return !note.deletedAt && !note.archived;
+        return !note.deletedAt;
       })
       .filter((note) => {
         const term = search.toLowerCase();
         const content = note.pages.map((page) => page.html.replace(/<[^>]*>/g, ' ')).join(' ');
         const folder = workspace.folders.find((item) => item.id === note.folderId)?.name ?? '';
-        const tags = workspace.tags
-          .filter((tag) => note.tagIds.includes(tag.id))
-          .map((tag) => tag.name)
-          .join(' ');
-        return `${note.title} ${content} ${folder} ${tags}`.toLowerCase().includes(term);
+
+        return `${note.title} ${content} ${folder}`.toLowerCase().includes(term);
       })
       .sort((left, right) =>
         noteSort === 'title'
@@ -337,6 +325,7 @@ export default function App() {
             : right.updatedAt - left.updatedAt,
       );
   }, [filter, noteSort, search, workspace]);
+
   useEffect(() => {
     if (!workspace) return;
 
@@ -379,12 +368,8 @@ export default function App() {
     if (filter.type === 'folder') {
       return workspace.folders.find((folder) => folder.id === filter.id)?.name ?? 'Folder';
     }
-    if (filter.type === 'archive') return 'Archive';
-    if (filter.type === 'trash') return 'Trash';
 
-    if (filter.type === 'tag') {
-      return `#${workspace.tags.find((tag) => tag.id === filter.id)?.name ?? 'tag'}`;
-    }
+    if (filter.type === 'trash') return 'Trash';
 
     return 'Notes';
   }, [filter, workspace]);
@@ -421,7 +406,7 @@ export default function App() {
     quickCapture = false,
     targetFolderId?: string,
   ) => {
-    if (filter.type === 'trash' || filter.type === 'archive') {
+    if (filter.type === 'trash') {
       setFilter({ type: 'all' });
     }
 
@@ -474,13 +459,11 @@ export default function App() {
       title: template === 'blank' && mode === 'document' ? 'Untitled note' : selected.title,
       mode,
       folderId,
-      tagIds: [],
       favorite: false,
       updatedAt: Date.now(),
       createdAt: Date.now(),
       openedAt: Date.now(),
       openCount: 1,
-      archived: false,
       captureKind:
         template === 'thought'
           ? 'quick'
@@ -810,13 +793,11 @@ export default function App() {
             title: file.name.replace(/\.[^.]+$/, ''),
             mode: 'document',
             folderId: 'inbox',
-            tagIds: [],
             favorite: false,
             updatedAt: Date.now(),
             createdAt: Date.now(),
             openedAt: Date.now(),
             openCount: 1,
-            archived: false,
             captureKind: 'standard',
             objects: [],
             pages: [
@@ -854,13 +835,11 @@ export default function App() {
             title: file.name.replace(/\.[^.]+$/, ''),
             mode: 'document',
             folderId: 'inbox',
-            tagIds: [],
             favorite: false,
             updatedAt: Date.now(),
             createdAt: Date.now(),
             openedAt: Date.now(),
             openCount: 1,
-            archived: false,
             captureKind: 'standard',
             objects: [],
             attachments: [{ id: makeId('attachment'), name: file.name, type: file.type, dataUrl }],
@@ -971,16 +950,6 @@ export default function App() {
     };
     setWorkspace({ ...workspace, notes: [copy, ...workspace.notes], activeNoteId: copy.id });
   };
-  const toggleArchive = (noteId: string) => {
-    const source = workspace.notes.find((note) => note.id === noteId);
-    if (!source) return;
-    setWorkspace({
-      ...workspace,
-      notes: workspace.notes.map((note) =>
-        note.id === noteId ? { ...note, archived: !note.archived, updatedAt: Date.now() } : note,
-      ),
-    });
-  };
   const trashNote = (noteId: string) => {
     if (!workspace) return;
     const remaining = workspace.notes.map((note) =>
@@ -1020,9 +989,7 @@ export default function App() {
     setWorkspace({
       ...workspace,
       notes: workspace.notes.map((note) =>
-        note.id === noteId
-          ? { ...note, deletedAt: undefined, archived: false, updatedAt: Date.now() }
-          : note,
+        note.id === noteId ? { ...note, deletedAt: undefined, updatedAt: Date.now() } : note,
       ),
     });
   };
@@ -1211,66 +1178,6 @@ export default function App() {
     });
   };
 
-  const deleteTag = (tagId: string) => {
-    const tag = workspace.tags.find((item) => item.id === tagId);
-
-    if (!tag) {
-      return;
-    }
-
-    setConfirmation({
-      title: `Delete “${tag.name}”?`,
-      message: 'It will be removed from its notes. The notes will remain.',
-      confirmLabel: 'Delete tag',
-      onConfirm: () =>
-        setWorkspace({
-          ...workspace,
-          tags: workspace.tags.filter((item) => item.id !== tagId),
-          notes: workspace.notes.map((note) =>
-            note.tagIds.includes(tagId)
-              ? { ...note, tagIds: note.tagIds.filter((id) => id !== tagId), updatedAt: Date.now() }
-              : note,
-          ),
-        }),
-    });
-
-    if (filter.type === 'tag' && filter.id === tagId) {
-      setFilter({ type: 'all' });
-    }
-  };
-
-  const renameTag = (tagId: string) => {
-    const tag = workspace.tags.find((item) => item.id === tagId);
-    if (!tag) return;
-    setTextDialog({
-      title: 'Rename tag',
-      label: 'Tag name',
-      initialValue: tag.name,
-      onConfirm: (name) =>
-        setWorkspace({
-          ...workspace,
-          tags: workspace.tags.map((item) => (item.id === tagId ? { ...item, name } : item)),
-        }),
-    });
-  };
-
-  const recolorTag = (tagId: string) => {
-    const tag = workspace.tags.find((item) => item.id === tagId);
-    if (!tag) return;
-    setTextDialog({
-      title: 'Change tag color',
-      label: 'Hex color',
-      initialValue: tag.color,
-      validate: (value) =>
-        /^#[0-9a-f]{6}$/i.test(value) ? null : 'Enter a six-digit hex color, such as #7DA8F4.',
-      onConfirm: (color) =>
-        setWorkspace({
-          ...workspace,
-          tags: workspace.tags.map((item) => (item.id === tagId ? { ...item, color } : item)),
-        }),
-    });
-  };
-
   const todayKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
   const focusItems = workspace.focusByDate?.[todayKey] ?? [];
   const updateFocus = (items: typeof focusItems) =>
@@ -1343,7 +1250,6 @@ export default function App() {
       >
         <Sidebar
           folders={workspace.folders}
-          tags={workspace.tags}
           filter={filter}
           onFilterChange={(nextFilter) => {
             setFilter(nextFilter);
@@ -1358,14 +1264,11 @@ export default function App() {
           onCreateFolder={createFolder}
           onCreateProjectFolder={createProjectFolder}
           onDeleteFolder={deleteFolder}
-          onDeleteTag={deleteTag}
           onRenameFolder={renameFolder}
           onRecolorFolder={recolorFolder}
           onUpdateFolder={updateProjectFolder}
           onDuplicateFolder={duplicateFolder}
           onChangeFolderIcon={changeFolderIcon}
-          onRenameTag={renameTag}
-          onRecolorTag={recolorTag}
           onOpenSettings={() => setSettingsOpen(true)}
           collapsed={sidebarCollapsed}
           onToggleCollapsed={() => setSidebarCollapsed((collapsed) => !collapsed)}
@@ -1381,7 +1284,6 @@ export default function App() {
         />
         <NotesList
           notes={visibleNotes}
-          tags={workspace.tags}
           folders={workspace.folders}
           activeNoteId={workspace.activeNoteId}
           search={search}
@@ -1391,13 +1293,12 @@ export default function App() {
           onSelectNote={openNote}
           onSelectFolder={(folderId) => setFilter({ type: 'folder', id: folderId })}
           onCreateNote={createNote}
-          onOpenAudio={() => setAudioOpen(true)}
+          onOpenAudio={startAudio}
           viewMode={noteView}
           sort={noteSort}
           onViewModeChange={setNoteView}
           onSortChange={handleSortChange}
           onDuplicate={duplicateNote}
-          onArchive={toggleArchive}
           onTrash={trashNote}
           onRestore={restoreNote}
           onDeleteForever={deleteForever}
@@ -1471,7 +1372,7 @@ export default function App() {
           onCreate={createNote}
           customTemplates={workspace.customTemplates ?? []}
           onCreateCustom={(id) => {
-            if (filter.type === 'trash' || filter.type === 'archive') {
+            if (filter.type === 'trash') {
               setFilter({ type: 'all' });
             }
 
@@ -1485,7 +1386,6 @@ export default function App() {
               updatedAt: Date.now(),
               openedAt: Date.now(),
               deletedAt: undefined,
-              archived: false,
             };
             setWorkspace({
               ...workspace,
@@ -1571,42 +1471,6 @@ export default function App() {
         </section>
       ) : (
         <section className="editor-shell">
-          <EditorHeader
-            note={activeNote}
-            libraryVisible={libraryVisible}
-            saveState={saveState}
-            onToggleLibrary={() => setLibraryVisible((visible) => !visible)}
-            onTitleChange={(title) => updateNote({ ...activeNote, title, updatedAt: Date.now() })}
-            onToggleFavorite={() => toggleFavorite(activeNote.id)}
-            onExport={() => downloadMarkdown(activeNote)}
-            canDelete={workspace.notes.filter((note) => !note.deletedAt).length > 1}
-            onDelete={deleteActiveNote}
-            onOpenSettings={() => setSettingsOpen(true)}
-            onDuplicate={() => duplicateNote(activeNote.id)}
-            onArchive={() => toggleArchive(activeNote.id)}
-            onSaveTemplate={() =>
-              setTextDialog({
-                title: 'Save as template',
-                label: 'Template name',
-                initialValue: activeNote.title,
-                onConfirm: (name) =>
-                  setWorkspace({
-                    ...workspace,
-                    customTemplates: [
-                      ...(workspace.customTemplates ?? []),
-                      {
-                        id: makeId('template'),
-                        name,
-                        mode: activeNote.mode,
-                        sourceNote: structuredClone(activeNote),
-                      },
-                    ],
-                  }),
-              })
-            }
-            folders={workspace.folders}
-            onMove={(folderId) => updateNote({ ...activeNote, folderId, updatedAt: Date.now() })}
-          />
           {activeNote.mode === 'document' ? (
             <DocumentEditor
               note={activeNote}
@@ -1784,17 +1648,18 @@ export default function App() {
                     </div>
                   ) : null
                 }
-              />
-              <ToolDock
-                tool={tool}
-                mode={activeNote.mode}
-                settings={workspace.settings}
-                onToolChange={setTool}
-                onColorChange={(penColor) => updateSettings({ ...workspace.settings, penColor })}
-                onShapeChange={(selectedShape) =>
-                  updateSettings({ ...workspace.settings, selectedShape })
-                }
-              />
+              >
+                <ToolDock
+                  tool={tool}
+                  mode={activeNote.mode}
+                  settings={workspace.settings}
+                  onToolChange={setTool}
+                  onColorChange={(penColor) => updateSettings({ ...workspace.settings, penColor })}
+                  onShapeChange={(selectedShape) =>
+                    updateSettings({ ...workspace.settings, selectedShape })
+                  }
+                />
+              </InfiniteCanvas>
             </>
           )}
         </section>
@@ -1816,7 +1681,6 @@ export default function App() {
         <CommandPalette
           notes={workspace.notes}
           folders={workspace.folders}
-          tags={workspace.tags}
           onClose={() => setCommandOpen(false)}
           onOpenNote={openNote}
           onOpenFilter={(type, id) => {

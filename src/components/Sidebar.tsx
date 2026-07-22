@@ -30,29 +30,20 @@ import {
 } from './LiquidOrb';
 
 export type LibraryFilter =
-  | { type: 'all' }
-  | { type: 'favorites' }
-  | { type: 'archive' }
-  | { type: 'trash' }
-  | { type: 'folder'; id: string }
-  | { type: 'tag'; id: string };
+  { type: 'all' } | { type: 'favorites' } | { type: 'trash' } | { type: 'folder'; id: string };
 
 interface SidebarProps {
   folders: FolderType[];
-  tags: TagType[];
   filter: LibraryFilter;
   onFilterChange: (filter: LibraryFilter) => void;
   onCreateFolder: () => void;
   onCreateProjectFolder: (projectId: string) => void;
   onDeleteFolder: (folderId: string) => void;
-  onDeleteTag: (tagId: string) => void;
   onRenameFolder: (folderId: string) => void;
   onRecolorFolder: (folderId: string) => void;
   onUpdateFolder?: (folderId: string, name: string, color: string, secondaryColor?: string) => void;
   onDuplicateFolder: (folderId: string) => void;
   onChangeFolderIcon: (folderId: string) => void;
-  onRenameTag: (tagId: string) => void;
-  onRecolorTag: (tagId: string) => void;
   onOpenSettings: () => void;
   collapsed: boolean;
   onToggleCollapsed: () => void;
@@ -65,34 +56,31 @@ const filterMatches = (left: LibraryFilter, right: LibraryFilter) =>
 
 export function Sidebar({
   folders,
-  tags,
   filter,
   onFilterChange,
   onCreateFolder,
   onCreateProjectFolder,
   onDeleteFolder,
-  onDeleteTag,
   onRenameFolder,
   onRecolorFolder,
   onUpdateFolder,
   onDuplicateFolder,
   onChangeFolderIcon,
-  onRenameTag,
-  onRecolorTag,
   onOpenSettings,
   collapsed,
   onToggleCollapsed,
   view,
   onViewChange,
 }: SidebarProps) {
-  const [menu, setMenu] = useState<{ type: 'folder' | 'tag'; id: string } | null>(null);
+  const [menu, setMenu] = useState<{ type: 'folder'; id: string } | null>(null);
   const [menuPlacement, setMenuPlacement] = useState<'up' | 'down'>('down');
   const [editingFolder, setEditingFolder] = useState<FolderType | null>(null);
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('#ff70a6');
   const [editSecondary, setEditSecondary] = useState('#ff9770');
-  const toggleMenu = (type: 'folder' | 'tag', id: string, anchor: HTMLElement) => {
+  const toggleMenu = (type: 'folder', id: string, anchor: HTMLElement) => {
     const rect = anchor.getBoundingClientRect();
+
     setMenuPlacement(rect.bottom + 190 > window.innerHeight ? 'up' : 'down');
     setMenu((prev) => (prev?.id === id ? null : { type, id }));
   };
@@ -104,12 +92,6 @@ export function Sidebar({
       icon: Heart,
       color: '#f19b3f',
       value: { type: 'favorites' } as LibraryFilter,
-    },
-    {
-      label: 'Archive',
-      icon: Archive,
-      color: '#8f65e9',
-      value: { type: 'archive' } as LibraryFilter,
     },
     { label: 'Trash', icon: Trash2, color: '#f19b3f', value: { type: 'trash' } as LibraryFilter },
   ];
@@ -132,7 +114,7 @@ export function Sidebar({
         />
       ) : null}
       <div className="brand-row" data-tauri-drag-region>
-        <img className="celestine-logo" src="/celestine-mark.svg" alt="" data-tauri-drag-region />
+        <img className="celestine-logo" src="/celestine-icon.png" alt="" data-tauri-drag-region />
         <div className="brand-copy" data-tauri-drag-region>
           <strong data-tauri-drag-region>Celestine</strong>
           <span data-tauri-drag-region>your universe of ideas ✦</span>
@@ -147,7 +129,9 @@ export function Sidebar({
         </button>
       </div>
 
-      <nav className="sidebar-nav" aria-label="Library">
+      <div className="sidebar-brand-divider" />
+
+      <nav className="sidebar-nav" aria-label="Library" style={{ marginTop: '2px' }}>
         <button
           className={view === 'home' ? 'nav-item active' : 'nav-item'}
           onClick={() => onViewChange('home')}
@@ -174,7 +158,6 @@ export function Sidebar({
               }}
               title={item.label}
               aria-label={item.label}
-              style={{ '--item-color': item.color } as React.CSSProperties}
             >
               <Icon size={16} strokeWidth={1.8} />
               <span>{item.label}</span>
@@ -191,12 +174,18 @@ export function Sidebar({
           <span>Templates</span>
         </button>
 
-        <div className="section-heading">
+        <div className="section-heading project-heading">
           <p className="section-label">Projects</p>
-          <button className="icon-button subtle" onClick={onCreateFolder} aria-label="New project">
-            <Plus size={15} />
+          <button
+            className="icon-button subtle add-project-btn"
+            onClick={onCreateFolder}
+            aria-label="New space"
+            title="New space"
+          >
+            <Plus size={14} />
           </button>
         </div>
+
         {folders
           .filter((folder) => folder.id !== 'inbox' && !folder.parentId)
           .map((folder) => {
@@ -226,82 +215,6 @@ export function Sidebar({
               />
             );
           })}
-
-        <div className="section-heading tag-heading">
-          <p className="section-label">Tags</p>
-        </div>
-        <div className="tag-stack">
-          {tags.map((tag) => {
-            const value = { type: 'tag', id: tag.id } as LibraryFilter;
-            const Icon = tag.id === 'thinking' ? Brain : PenLine;
-
-            return (
-              <div className="sidebar-row" key={tag.id}>
-                <button
-                  className={filterMatches(filter, value) ? 'tag-filter active' : 'tag-filter'}
-                  onClick={() => {
-                    onFilterChange(value);
-                    onViewChange('notes');
-                  }}
-                  title={tag.name}
-                  aria-label={tag.name}
-                  style={{ '--item-color': tag.color } as React.CSSProperties}
-                >
-                  <Icon size={17} strokeWidth={1.8} />
-                  <span>{tag.name}</span>
-                  <span className="nav-color-dot" style={{ background: tag.color }} />
-                </button>
-                <button
-                  className="sidebar-more"
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onMouseDown={(event) => event.stopPropagation()}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    toggleMenu('tag', tag.id, event.currentTarget);
-                  }}
-                  aria-label={`Actions for ${tag.name}`}
-                  title="Tag actions"
-                >
-                  <MoreHorizontal size={15} />
-                </button>
-                {menu?.type === 'tag' && menu.id === tag.id ? (
-                  <div
-                    className={`sidebar-context-menu ${menuPlacement === 'up' ? 'open-up' : ''}`}
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onMouseDown={(event) => event.stopPropagation()}
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <button
-                      onClick={() => {
-                        onRenameTag(tag.id);
-                        setMenu(null);
-                      }}
-                    >
-                      Rename
-                    </button>
-                    <button
-                      onClick={() => {
-                        onRecolorTag(tag.id);
-                        setMenu(null);
-                      }}
-                    >
-                      Change color
-                    </button>
-                    <button
-                      className="danger"
-                      onClick={() => {
-                        onDeleteTag(tag.id);
-                        setMenu(null);
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
       </nav>
 
       <div className="sidebar-footer">
@@ -505,16 +418,18 @@ function ProjectItemRow({
               size={18}
             />
           )}
-          <span className="folder-label">{folder.name}</span>
+          {collapsed ? null : <span className="folder-label">{folder.name}</span>}
         </button>
-        <button
-          className={menuCoords ? 'sidebar-more active' : 'sidebar-more'}
-          onClick={handleToggle}
-          aria-label={`Actions for ${folder.name}`}
-          title="Project options"
-        >
-          <MoreHorizontal size={15} />
-        </button>
+        {collapsed ? null : (
+          <button
+            className={menuCoords ? 'sidebar-more active' : 'sidebar-more'}
+            onClick={handleToggle}
+            aria-label={`Actions for ${folder.name}`}
+            title="Project options"
+          >
+            <MoreHorizontal size={15} />
+          </button>
+        )}
         {menuCoords ? (
           <div
             className="sidebar-context-menu"

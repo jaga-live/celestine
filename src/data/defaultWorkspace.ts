@@ -10,17 +10,12 @@ export const defaultWorkspace: Workspace = {
     { id: 'personal', name: 'Personal', color: '#8f65e9' },
     { id: 'ideas', name: 'Ideas', color: '#f19b3f' },
   ],
-  tags: [
-    { id: 'thinking', name: 'thinking', color: '#8f65e9' },
-    { id: 'sketch', name: 'sketch', color: '#f19b3f' },
-  ],
   notes: [
     {
       id: 'welcome-note',
       title: 'Study notes',
       mode: 'document',
       folderId: 'inbox',
-      tagIds: ['thinking', 'sketch'],
       favorite: true,
       updatedAt: now,
       createdAt: now,

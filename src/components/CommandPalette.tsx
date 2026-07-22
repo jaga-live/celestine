@@ -3,22 +3,20 @@ import {
   Command,
   FileText,
   Folder,
-  Hash,
   LayoutTemplate,
   Mic,
   PenLine,
   Search,
   Settings,
 } from 'lucide-react';
-import type { Folder as FolderType, Note, Tag } from '../types';
+import type { Folder as FolderType, Note } from '../types';
 
 interface CommandPaletteProps {
   notes: Note[];
   folders: FolderType[];
-  tags: Tag[];
   onClose: () => void;
   onOpenNote: (id: string) => void;
-  onOpenFilter: (type: 'folder' | 'tag', id: string) => void;
+  onOpenFilter: (type: 'folder', id: string) => void;
   onOpenTemplates: () => void;
   onOpenSettings: () => void;
   onQuickNote: () => void;
@@ -41,7 +39,6 @@ const noteText = (note: Note) =>
 export function CommandPalette({
   notes,
   folders,
-  tags,
   onClose,
   onOpenNote,
   onOpenFilter,
@@ -57,7 +54,7 @@ export function CommandPalette({
     const matches = (value: string) => !term || value.toLowerCase().includes(term);
     return [
       ...notes
-        .filter((note) => !note.archived && noteText(note).includes(term))
+        .filter((note) => noteText(note).includes(term))
         .slice(0, 7)
         .map((note) => ({
           id: `note-${note.id}`,
@@ -74,15 +71,6 @@ export function CommandPalette({
           group: 'Spaces',
           icon: Folder,
           action: () => onOpenFilter('folder', folder.id),
-        })),
-      ...tags
-        .filter((tag) => matches(tag.name))
-        .map((tag) => ({
-          id: `tag-${tag.id}`,
-          label: `#${tag.name}`,
-          group: 'Tags',
-          icon: Hash,
-          action: () => onOpenFilter('tag', tag.id),
         })),
       ...[
         {
@@ -142,7 +130,6 @@ export function CommandPalette({
     onOpenTemplates,
     onQuickNote,
     query,
-    tags,
   ]);
 
   useEffect(() => setActive(0), [query]);
