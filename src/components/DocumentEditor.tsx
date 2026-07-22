@@ -173,186 +173,8 @@ export function DocumentEditor({
         }
       }}
     >
-      <div className="document-topbar">
-        {children}
-        <div className="document-format-bar" aria-label="Text formatting">
-          {formatButton('Undo', <Undo2 size={16} />, (editor) =>
-            editor.chain().focus().undo().run(),
-          )}
-          {formatButton('Redo', <Redo2 size={16} />, (editor) =>
-            editor.chain().focus().redo().run(),
-          )}
-          <span />
-          <select
-            className="toolbar-select"
-            aria-label="Font size"
-            disabled={!activeEditor}
-            onChange={(event) => {
-              const val = event.target.value;
-              if (activeEditor) {
-                if (val === 'normal') {
-                  activeEditor.chain().focus().setMark('textStyle', { fontSize: null }).run();
-                } else {
-                  activeEditor.chain().focus().setMark('textStyle', { fontSize: val }).run();
-                }
-              }
-            }}
-          >
-            <option value="normal">Size</option>
-            <option value="13px">13px</option>
-            <option value="16px">16px</option>
-            <option value="20px">20px</option>
-            <option value="26px">26px</option>
-            <option value="34px">34px</option>
-          </select>
-          <div className="color-palette-container">
-            <button
-              className={colorMenuOpen ? 'active' : ''}
-              disabled={!activeEditor}
-              onClick={() => setColorMenuOpen((open) => !open)}
-              aria-label="Color palette"
-              title="Text color"
-            >
-              <Palette size={16} />
-            </button>
-            {colorMenuOpen && activeEditor ? (
-              <div className="text-color-palette tinted-glass">
-                <div className="swatch-grid">
-                  {PALETTE_COLORS.map((c) => (
-                    <button
-                      key={c.id}
-                      className="swatch-item"
-                      style={{ backgroundColor: c.value || '#e2e8f0' }}
-                      title={c.label}
-                      onClick={() => {
-                        if (c.value) {
-                          activeEditor.chain().focus().setMark('textStyle', { color: c.value }).run();
-                        } else {
-                          activeEditor.chain().focus().setMark('textStyle', { color: null }).run();
-                        }
-                        setColorMenuOpen(false);
-                      }}
-                    />
-                  ))}
-                </div>
-                <label className="custom-color-row">
-                  <span>Custom</span>
-                  <input
-                    type="color"
-                    onChange={(event) => {
-                      activeEditor.chain().focus().setMark('textStyle', { color: event.target.value }).run();
-                      setColorMenuOpen(false);
-                    }}
-                  />
-                </label>
-              </div>
-            ) : null}
-          </div>
-          <span />
-          {formatButton(
-            'Bold',
-            <Bold size={16} />,
-            (editor) => editor.chain().focus().toggleBold().run(),
-            Boolean(activeEditor?.isActive('bold')),
-          )}
-          {formatButton(
-            'Italic',
-            <Italic size={16} />,
-            (editor) => editor.chain().focus().toggleItalic().run(),
-            Boolean(activeEditor?.isActive('italic')),
-          )}
-          {formatButton(
-            'Heading',
-            <Heading2 size={17} />,
-            (editor) => editor.chain().focus().toggleHeading({ level: 2 }).run(),
-            Boolean(activeEditor?.isActive('heading', { level: 2 })),
-          )}
-          {formatButton(
-            'Bullet list',
-            <List size={17} />,
-            (editor) => editor.chain().focus().toggleBulletList().run(),
-            Boolean(activeEditor?.isActive('bulletList')),
-          )}
-          {formatButton(
-            'Checklist',
-            <CheckSquare size={16} />,
-            (editor) => editor.chain().focus().toggleTaskList().run(),
-            Boolean(activeEditor?.isActive('taskList')),
-          )}
-          {formatButton('Table', <Table2 size={16} />, (editor) =>
-            editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
-          )}
-        </div>
-      </div>
-
-      <div className="document-viewport-controls">
-        <div className="document-zoom-control" aria-label="Page zoom">
-          <button
-            onClick={() =>
-              setDocumentZoom((zoom) => Math.max(0.9, Number((zoom - 0.1).toFixed(2))))
-            }
-            aria-label="Zoom out"
-          >
-            <Minus size={14} />
-          </button>
-          <button onClick={() => setDocumentZoom(1.28)} aria-label="Reset page zoom">
-            {Math.round(documentZoom * 100)}%
-          </button>
-          <button
-            onClick={() =>
-              setDocumentZoom((zoom) => Math.min(1.5, Number((zoom + 0.1).toFixed(2))))
-            }
-            aria-label="Zoom in"
-          >
-            <Plus size={14} />
-          </button>
-        </div>
-        <div className="document-paper-control">
-          <button
-            className={paperMenuOpen ? 'active' : ''}
-            onClick={() => setPaperMenuOpen((open) => !open)}
-            aria-label="Page appearance"
-          >
-            A4 · {paperPatterns.find((item) => item.id === note.canvasPattern)?.label}
-            <ChevronDown size={14} />
-          </button>
-          {paperMenuOpen ? (
-            <div className="paper-menu">
-              <p>Paper</p>
-              <div className="paper-color-row">
-                {paperColors.map((color) => (
-                  <button
-                    key={color}
-                    className={note.canvasColor === color ? 'active' : ''}
-                    style={{ backgroundColor: color }}
-                    onClick={() => updateSurface({ canvasColor: color })}
-                    aria-label={`Page color ${color}`}
-                  >
-                    {note.canvasColor === color ? <Check size={12} /> : null}
-                  </button>
-                ))}
-              </div>
-              <p>Layout</p>
-              <div className="paper-pattern-row">
-                {paperPatterns.map((pattern) => (
-                  <button
-                    key={pattern.id}
-                    className={note.canvasPattern === pattern.id ? 'active' : ''}
-                    onClick={() => updateSurface({ canvasPattern: pattern.id })}
-                  >
-                    <span className={`pattern-preview ${pattern.id}`} />
-                    {pattern.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="document-scroll">
-        {audioPlayer}
-        <div className="document-header">
+      <div className="editor-banner-container">
+        <div className="editor-title-row">
           <input
             className="document-inline-title"
             value={note.title}
@@ -362,11 +184,206 @@ export function DocumentEditor({
             placeholder="Untitled"
             aria-label="Note title"
           />
-          <span className="document-mode-label">
+          <div className="document-mode-label">
             <FileText size={14} /> Document · {note.pages.length}{' '}
             {note.pages.length === 1 ? 'page' : 'pages'} · {wordCount} words
-          </span>
+          </div>
         </div>
+
+        <div className="editor-full-toolbar">
+          <div className="toolbar-left-group">
+            {children}
+            <div className="document-format-bar" aria-label="Text formatting">
+              {formatButton('Undo', <Undo2 size={16} />, (editor) =>
+                editor.chain().focus().undo().run(),
+              )}
+              {formatButton('Redo', <Redo2 size={16} />, (editor) =>
+                editor.chain().focus().redo().run(),
+              )}
+              <span />
+              <select
+                className="toolbar-select font-size-select"
+                aria-label="Font size"
+                value={activeEditor?.getAttributes('textStyle').fontSize || '16px'}
+                disabled={!activeEditor}
+                onChange={(event) => {
+                  const val = event.target.value;
+                  if (activeEditor) {
+                    if (val === '16px') {
+                      activeEditor.chain().focus().setMark('textStyle', { fontSize: null }).run();
+                    } else {
+                      activeEditor.chain().focus().setMark('textStyle', { fontSize: val }).run();
+                    }
+                  }
+                }}
+              >
+                <option value="13px">13px</option>
+                <option value="16px">16px</option>
+                <option value="20px">20px</option>
+                <option value="26px">26px</option>
+                <option value="34px">34px</option>
+              </select>
+              <div className="color-palette-container">
+                <button
+                  className={colorMenuOpen ? 'active' : ''}
+                  disabled={!activeEditor}
+                  onClick={() => setColorMenuOpen((open) => !open)}
+                  aria-label="Color palette"
+                  title="Text color"
+                >
+                  <Palette size={16} />
+                </button>
+                {colorMenuOpen && activeEditor ? (
+                  <div className="text-color-palette tinted-glass">
+                    <div className="swatch-grid">
+                      {PALETTE_COLORS.map((c) => (
+                        <button
+                          key={c.id}
+                          className="swatch-item"
+                          style={{ backgroundColor: c.value || '#e2e8f0' }}
+                          title={c.label}
+                          onClick={() => {
+                            if (c.value) {
+                              activeEditor
+                                .chain()
+                                .focus()
+                                .setMark('textStyle', { color: c.value })
+                                .run();
+                            } else {
+                              activeEditor
+                                .chain()
+                                .focus()
+                                .setMark('textStyle', { color: null })
+                                .run();
+                            }
+                            setColorMenuOpen(false);
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <label className="custom-color-row">
+                      <span>Custom</span>
+                      <input
+                        type="color"
+                        onChange={(event) => {
+                          activeEditor
+                            .chain()
+                            .focus()
+                            .setMark('textStyle', { color: event.target.value })
+                            .run();
+                          setColorMenuOpen(false);
+                        }}
+                      />
+                    </label>
+                  </div>
+                ) : null}
+              </div>
+              <span />
+              {formatButton(
+                'Bold',
+                <Bold size={16} />,
+                (editor) => editor.chain().focus().toggleBold().run(),
+                Boolean(activeEditor?.isActive('bold')),
+              )}
+              {formatButton(
+                'Italic',
+                <Italic size={16} />,
+                (editor) => editor.chain().focus().toggleItalic().run(),
+                Boolean(activeEditor?.isActive('italic')),
+              )}
+              {formatButton(
+                'Heading',
+                <Heading2 size={17} />,
+                (editor) => editor.chain().focus().toggleHeading({ level: 2 }).run(),
+                Boolean(activeEditor?.isActive('heading', { level: 2 })),
+              )}
+              {formatButton(
+                'Bullet list',
+                <List size={17} />,
+                (editor) => editor.chain().focus().toggleBulletList().run(),
+                Boolean(activeEditor?.isActive('bulletList')),
+              )}
+              {formatButton(
+                'Checklist',
+                <CheckSquare size={16} />,
+                (editor) => editor.chain().focus().toggleTaskList().run(),
+                Boolean(activeEditor?.isActive('taskList')),
+              )}
+              {formatButton('Table', <Table2 size={16} />, (editor) =>
+                editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+              )}
+            </div>
+          </div>
+
+          <div className="toolbar-right-group">
+            <div className="document-zoom-control" aria-label="Page zoom">
+              <button
+                onClick={() =>
+                  setDocumentZoom((zoom) => Math.max(0.9, Number((zoom - 0.1).toFixed(2))))
+                }
+                aria-label="Zoom out"
+              >
+                <Minus size={14} />
+              </button>
+              <button onClick={() => setDocumentZoom(1.28)} aria-label="Reset page zoom">
+                {Math.round(documentZoom * 100)}%
+              </button>
+              <button
+                onClick={() =>
+                  setDocumentZoom((zoom) => Math.min(1.5, Number((zoom + 0.1).toFixed(2))))
+                }
+                aria-label="Zoom in"
+              >
+                <Plus size={14} />
+              </button>
+            </div>
+            <div className="document-paper-control">
+              <button
+                className={paperMenuOpen ? 'active' : ''}
+                onClick={() => setPaperMenuOpen((open) => !open)}
+                aria-label="Page appearance"
+              >
+                A4 · {paperPatterns.find((item) => item.id === note.canvasPattern)?.label}
+                <ChevronDown size={14} />
+              </button>
+              {paperMenuOpen ? (
+                <div className="paper-menu">
+                  <p>Paper</p>
+                  <div className="paper-color-row">
+                    {paperColors.map((color) => (
+                      <button
+                        key={color}
+                        className={note.canvasColor === color ? 'active' : ''}
+                        style={{ backgroundColor: color }}
+                        onClick={() => updateSurface({ canvasColor: color })}
+                        aria-label={`Page color ${color}`}
+                      >
+                        {note.canvasColor === color ? <Check size={12} /> : null}
+                      </button>
+                    ))}
+                  </div>
+                  <p>Layout</p>
+                  <div className="paper-pattern-row">
+                    {paperPatterns.map((pattern) => (
+                      <button
+                        key={pattern.id}
+                        className={note.canvasPattern === pattern.id ? 'active' : ''}
+                        onClick={() => updateSurface({ canvasPattern: pattern.id })}
+                      >
+                        <span className={`pattern-preview ${pattern.id}`} />
+                        {pattern.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="document-scroll">
+        {audioPlayer}
         <div
           className="document-page-stack"
           style={{ '--document-zoom': documentZoom } as React.CSSProperties}

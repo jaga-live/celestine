@@ -168,7 +168,11 @@ export function TextCard({
                 <input
                   type="color"
                   onChange={(event) => {
-                    editor.chain().focus().setMark('textStyle', { color: event.target.value }).run();
+                    editor
+                      .chain()
+                      .focus()
+                      .setMark('textStyle', { color: event.target.value })
+                      .run();
                     setColorMenuOpen(false);
                   }}
                 />

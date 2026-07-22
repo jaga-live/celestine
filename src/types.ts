@@ -4,6 +4,8 @@ export type HandwritingConversion = 'manual' | 'after-delay';
 export type HandwritingFont = 'chalkboard' | 'noteworthy' | 'bradley-hand';
 export type CanvasPattern = 'plain' | 'dots' | 'ruled' | 'grid';
 export type NoteMode = 'document' | 'canvas';
+export type CelestineTemplate =
+  'blank' | 'study' | 'system' | 'meeting' | 'mindmap' | 'revision' | 'thought' | 'audio';
 
 export interface Point {
   x: number;

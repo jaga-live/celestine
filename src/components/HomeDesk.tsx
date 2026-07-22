@@ -280,10 +280,7 @@ export function HomeDesk({
 
   return (
     <section className="celestine-home">
-      <header
-        className="celestine-topbar"
-        data-tauri-drag-region
-      >
+      <header className="celestine-topbar" data-tauri-drag-region>
         <button className="celestine-search search-button" onClick={onOpenSearch}>
           <Search size={15} />
           <span>Search anything…</span>

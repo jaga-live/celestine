@@ -310,7 +310,10 @@ export function SettingsPanel({
                     >
                       <option
                         value="chalkboard"
-                        style={{ fontFamily: "'Chalkboard SE', 'Chalkboard', cursive", fontSize: '18px' }}
+                        style={{
+                          fontFamily: "'Chalkboard SE', 'Chalkboard', cursive",
+                          fontSize: '18px',
+                        }}
                       >
                         Chalkboard
                       </option>
@@ -367,7 +370,8 @@ export function SettingsPanel({
                 <section className="settings-section">
                   <h3>Creation & Global Keybinds</h3>
                   <p>
-                    Use <code>Cmd / Ctrl + Shift + Key</code> to create notes and open workspaces instantly.
+                    Use <code>Cmd / Ctrl + Shift + Key</code> to create notes and open workspaces
+                    instantly.
                   </p>
                   <div className="shortcut-grid">
                     {Object.entries({
@@ -416,7 +420,9 @@ export function SettingsPanel({
                       <label key={command}>
                         <span>{label}</span>
                         <input
-                          value={(settings.shortcuts[command as keyof typeof settings.shortcuts] ?? '').toUpperCase()}
+                          value={(
+                            settings.shortcuts[command as keyof typeof settings.shortcuts] ?? ''
+                          ).toUpperCase()}
                           maxLength={1}
                           onChange={(event) =>
                             update('shortcuts', {

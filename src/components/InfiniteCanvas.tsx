@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ImagePlus, Layers2, LoaderCircle, Maximize2, Minus, Plus, Redo2, Undo2 } from 'lucide-react';
+import {
+  Check,
+  ImagePlus,
+  Layers2,
+  LoaderCircle,
+  Maximize2,
+  Minus,
+  Plus,
+  Redo2,
+  Undo2,
+} from 'lucide-react';
 import type {
   Camera,
   CanvasPattern,
@@ -433,8 +443,6 @@ export function InfiniteCanvas({
     return events.map(pointerWorldPoint);
   };
 
-
-
   const updateCamera = (nextCamera: Camera) => {
     const nextNote = { ...noteRef.current, camera: nextCamera };
 
@@ -499,10 +507,7 @@ export function InfiniteCanvas({
     setConversion(null);
   };
 
-  const recognizeStrokes = (
-    strokes: InkStroke[],
-    bounds: WorldRect,
-  ) => {
+  const recognizeStrokes = (strokes: InkStroke[], bounds: WorldRect) => {
     const state: ConversionState = {
       status: 'recognizing',
       bounds,
@@ -1045,8 +1050,6 @@ export function InfiniteCanvas({
       {tool === 'handwriting' ? (
         <div className="canvas-hint">Draw a box around handwriting to convert it</div>
       ) : null}
-
-
 
       <input
         ref={fileInputRef}

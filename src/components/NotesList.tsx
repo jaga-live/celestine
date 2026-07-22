@@ -20,7 +20,7 @@ import {
   Search,
   Trash2,
 } from 'lucide-react';
-import type { Folder, Note, NoteMode, Tag } from '../types';
+import type { CelestineTemplate, Folder, Note, NoteMode, Tag } from '../types';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 interface NotesListProps {
@@ -34,7 +34,7 @@ interface NotesListProps {
   onSearchChange: (value: string) => void;
   onSelectNote: (id: string) => void;
   onSelectFolder?: (folderId: string) => void;
-  onCreateNote: (mode: NoteMode) => void;
+  onCreateNote: (mode: NoteMode, template?: CelestineTemplate) => void;
   onOpenAudio?: () => void;
   viewMode: 'list' | 'grid';
   sort: 'updated' | 'created' | 'title';
@@ -213,15 +213,16 @@ export function NotesList({
 
   return (
     <section className="notes-panel app-panel">
-      <div
-        className="notes-header-stack"
-        data-tauri-drag-region
-      >
+      <div className="notes-header-stack" data-tauri-drag-region>
         {breadcrumb ? (
           <div className="notes-breadcrumb-line" data-tauri-drag-region>
             <span data-tauri-drag-region>Projects</span>
-            <span className="separator" data-tauri-drag-region>›</span>
-            <span className="current" data-tauri-drag-region>{breadcrumb.split(' / ').pop()}</span>
+            <span className="separator" data-tauri-drag-region>
+              ›
+            </span>
+            <span className="current" data-tauri-drag-region>
+              {breadcrumb.split(' / ').pop()}
+            </span>
           </div>
         ) : null}
 
@@ -274,6 +275,18 @@ export function NotesList({
                   <span>
                     <strong>Canvas</strong>
                     <small>Open space for mapping ideas</small>
+                  </span>
+                </button>
+                <button
+                  onClick={() => {
+                    onCreateNote('document', 'audio');
+                    setNewNoteMenuOpen(false);
+                  }}
+                >
+                  <Mic size={16} />
+                  <span>
+                    <strong>Audio note</strong>
+                    <small>Record voice & auto-transcribe</small>
                   </span>
                 </button>
               </div>
@@ -537,7 +550,9 @@ export function NotesList({
         })}
         {visibleCount < notes.length && (
           <div className="notes-load-more-indicator">
-            <span>Showing {visibleNotesSlice.length} of {notes.length} notes (scroll to load more)</span>
+            <span>
+              Showing {visibleNotesSlice.length} of {notes.length} notes (scroll to load more)
+            </span>
           </div>
         )}
         {!notes.length ? (
@@ -586,6 +601,23 @@ export function NotesList({
               <p className="empty-space-desc">
                 {title} is empty. Capture ideas, plans, and milestones to keep your vision on track.
               </p>
+              <div
+                className="empty-space-actions"
+                style={{ marginTop: '16px', justifyContent: 'center' }}
+              >
+                <button className="btn-secondary-flat" onClick={() => onCreateNote('document')}>
+                  <FileText size={14} /> + Note
+                </button>
+                <button className="btn-secondary-flat" onClick={() => onCreateNote('canvas')}>
+                  <PenLine size={14} /> + Canvas
+                </button>
+                <button
+                  className="btn-secondary-flat"
+                  onClick={() => onCreateNote('document', 'audio')}
+                >
+                  <Mic size={14} /> + Audio note
+                </button>
+              </div>
             </div>
           )
         ) : null}

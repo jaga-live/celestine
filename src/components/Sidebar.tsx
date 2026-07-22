@@ -132,12 +132,7 @@ export function Sidebar({
         />
       ) : null}
       <div className="brand-row" data-tauri-drag-region>
-        <img
-          className="celestine-logo"
-          src="/celestine-mark.svg"
-          alt=""
-          data-tauri-drag-region
-        />
+        <img className="celestine-logo" src="/celestine-mark.svg" alt="" data-tauri-drag-region />
         <div className="brand-copy" data-tauri-drag-region>
           <strong data-tauri-drag-region>Celestine</strong>
           <span data-tauri-drag-region>your universe of ideas ✦</span>
@@ -489,7 +484,11 @@ function ProjectItemRow({
 
   return (
     <div className="project-group">
-      <div className={isActive ? 'sidebar-row active' : menuCoords ? 'sidebar-row has-menu-open' : 'sidebar-row'}>
+      <div
+        className={
+          isActive ? 'sidebar-row active' : menuCoords ? 'sidebar-row has-menu-open' : 'sidebar-row'
+        }
+      >
         <button
           className="sidebar-row-click-target"
           onClick={() => onFilterChange(value)}
@@ -649,7 +648,15 @@ function SubfolderItemRow({
   };
 
   return (
-    <div className={isChildActive ? 'sidebar-row child-folder active' : menuCoords ? 'sidebar-row child-folder has-menu-open' : 'sidebar-row child-folder'}>
+    <div
+      className={
+        isChildActive
+          ? 'sidebar-row child-folder active'
+          : menuCoords
+            ? 'sidebar-row child-folder has-menu-open'
+            : 'sidebar-row child-folder'
+      }
+    >
       <button
         className="sidebar-row-click-target"
         onClick={() => {
@@ -658,10 +665,7 @@ function SubfolderItemRow({
         }}
         title={child.name}
       >
-        <span
-          className="child-folder-dot"
-          style={{ background: child.color || '#f97316' }}
-        />
+        <span className="child-folder-dot" style={{ background: child.color || '#f97316' }} />
         <span className="folder-label">{child.name}</span>
       </button>
       <button

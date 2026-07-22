@@ -130,11 +130,21 @@ export default function App() {
 
   useEffect(() => {
     try {
-      getCurrentWindow().maximize().catch(() => {});
+      getCurrentWindow()
+        .maximize()
+        .catch(() => {});
     } catch {
       // Ignore if not in desktop window environment
     }
   }, []);
+
+  useEffect(() => {
+    if (!workspace) {
+      return;
+    }
+
+    document.documentElement.setAttribute('data-theme', workspace.settings.theme);
+  }, [workspace?.settings.theme]);
 
   useEffect(() => {
     if (!workspace || !hydrated.current) {
@@ -191,11 +201,15 @@ export default function App() {
             message: 'Are you sure you want to exit Celestine?',
             confirmLabel: 'Quit',
             onConfirm: () => {
-              getCurrentWindow().close().catch(() => window.close());
+              getCurrentWindow()
+                .close()
+                .catch(() => window.close());
             },
           });
         } else {
-          getCurrentWindow().close().catch(() => window.close());
+          getCurrentWindow()
+            .close()
+            .catch(() => window.close());
         }
 
         return;
@@ -405,12 +419,13 @@ export default function App() {
     mode: NoteMode = 'document',
     template: CelestineTemplate = 'blank',
     quickCapture = false,
+    targetFolderId?: string,
   ) => {
     if (filter.type === 'trash' || filter.type === 'archive') {
       setFilter({ type: 'all' });
     }
 
-    const folderId = filter.type === 'folder' ? filter.id : 'inbox';
+    const folderId = targetFolderId ?? (filter.type === 'folder' ? filter.id : 'inbox');
     const timestampLabel = new Intl.DateTimeFormat('en-US', {
       month: 'long',
       day: 'numeric',
@@ -1051,7 +1066,9 @@ export default function App() {
           const remaining = prev.notes.filter((note) => !noteIds.includes(note.id));
           const activeDeleted = noteIds.includes(prev.activeNoteId);
           const nextActiveId = activeDeleted
-            ? (remaining.find((n) => !noteIds.includes(n.id) && !n.deletedAt)?.id ?? remaining[0]?.id ?? '')
+            ? (remaining.find((n) => !noteIds.includes(n.id) && !n.deletedAt)?.id ??
+              remaining[0]?.id ??
+              '')
             : prev.activeNoteId;
 
           return {

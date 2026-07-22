@@ -17,16 +17,21 @@ import {
   Box,
   Play,
 } from 'lucide-react';
-import type { Folder, Note, NoteMode } from '../types';
+import type { CelestineTemplate, Folder, Note, NoteMode } from '../types';
 
 interface ProjectDeskProps {
   project: Folder;
   folders: Folder[];
   notes: Note[];
   onOpenNote: (id: string) => void;
-  onCreateNote: (mode: NoteMode) => void;
+  onCreateNote: (
+    mode: NoteMode,
+    template?: CelestineTemplate,
+    quickCapture?: boolean,
+    folderId?: string,
+  ) => void;
   onCreateFolder: () => void;
-  onOpenFolder: (id: string) => void;
+  onOpenFolder?: (id: string) => void;
   onAllProjects?: () => void;
   onRenameFolder?: (folderId: string) => void;
   onDeleteFolder?: (folderId: string) => void;
@@ -126,10 +131,16 @@ export function ProjectDesk({
         </div>
         <div className="header-actions">
           <button className="btn-secondary-flat" onClick={onCreateFolder}>
-            <FolderPlus size={16} /> New folder
+            <FolderPlus size={16} /> New space
           </button>
-          <button className="btn-primary-flat" onClick={() => onCreateNote('document')}>
-            <Plus size={16} /> New note
+          <button className="btn-secondary-flat" onClick={() => onCreateNote('document')}>
+            <FileText size={16} /> + Note
+          </button>
+          <button className="btn-secondary-flat" onClick={() => onCreateNote('canvas')}>
+            <PenLine size={16} /> + Canvas
+          </button>
+          <button className="btn-primary-flat" onClick={() => onCreateNote('document', 'audio')}>
+            <Mic size={16} /> + Audio note
           </button>
         </div>
       </header>
@@ -420,6 +431,26 @@ export function ProjectDesk({
                       );
                     })}
                   </div>
+                  <div className="folder-quick-actions">
+                    <button
+                      className="btn-secondary-flat compact"
+                      onClick={() => onCreateNote('document', 'blank', false, project.id)}
+                    >
+                      <Plus size={13} /> Note
+                    </button>
+                    <button
+                      className="btn-secondary-flat compact"
+                      onClick={() => onCreateNote('canvas', 'blank', false, project.id)}
+                    >
+                      <Plus size={13} /> Canvas
+                    </button>
+                    <button
+                      className="btn-secondary-flat compact"
+                      onClick={() => onCreateNote('document', 'audio', false, project.id)}
+                    >
+                      <Plus size={13} /> Audio note
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -443,6 +474,16 @@ export function ProjectDesk({
                     <span className="space-badge">{folderNotes.length} items</span>
                   </div>
                   <div className="accordion-header-right" style={{ position: 'relative' }}>
+                    <button
+                      className="btn-secondary-flat compact"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onCreateNote('document', 'blank', false, folder.id);
+                      }}
+                      title="Create note in this space"
+                    >
+                      <Plus size={14} /> Note
+                    </button>
                     <button
                       className="icon-btn-subtle"
                       onClick={(e) => {
@@ -507,79 +548,128 @@ export function ProjectDesk({
                 {!isCollapsed && (
                   <div className="accordion-body">
                     {folderNotes.length > 0 ? (
-                      <div className="cards-grid">
-                        {folderNotes.map((n) => {
-                          const isCanvas = n.mode === 'canvas';
-                          const isAudio = Boolean(n.audioDataUrl);
+                      <>
+                        <div className="cards-grid">
+                          {folderNotes.map((n) => {
+                            const isCanvas = n.mode === 'canvas';
+                            const isAudio = Boolean(n.audioDataUrl);
 
-                          return (
-                            <div
-                              key={n.id}
-                              className="preview-card"
-                              onClick={() => onOpenNote(n.id)}
-                            >
-                              <div className="card-top">
-                                <div className="card-type-header">
-                                  {isCanvas ? (
-                                    <Box size={16} className="icon-purple" />
-                                  ) : isAudio ? (
-                                    <Mic size={16} className="icon-magenta" />
-                                  ) : (
-                                    <FileText size={16} className="icon-blue" />
-                                  )}
-                                  <div className="card-title-group">
-                                    <strong className="card-title">{n.title || 'Untitled'}</strong>
-                                    <span className="card-subtitle">
-                                      {isCanvas ? 'System design' : isAudio ? 'Audio note' : 'Note'}{' '}
-                                      · Updated {relativeTime(n.updatedAt)}
-                                    </span>
+                            return (
+                              <div
+                                key={n.id}
+                                className="preview-card"
+                                onClick={() => onOpenNote(n.id)}
+                              >
+                                <div className="card-top">
+                                  <div className="card-type-header">
+                                    {isCanvas ? (
+                                      <Box size={16} className="icon-purple" />
+                                    ) : isAudio ? (
+                                      <Mic size={16} className="icon-magenta" />
+                                    ) : (
+                                      <FileText size={16} className="icon-blue" />
+                                    )}
+                                    <div className="card-title-group">
+                                      <strong className="card-title">
+                                        {n.title || 'Untitled'}
+                                      </strong>
+                                      <span className="card-subtitle">
+                                        {isCanvas
+                                          ? 'System design'
+                                          : isAudio
+                                            ? 'Audio note'
+                                            : 'Note'}{' '}
+                                        · Updated {relativeTime(n.updatedAt)}
+                                      </span>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
 
-                              {/* Card Content Snippet / Widget */}
-                              <div className="card-snippet-box">
-                                {isAudio ? (
-                                  <div className="audio-preview-widget">
-                                    <svg className="waveform-svg" viewBox="0 0 200 30">
-                                      <path
-                                        d="M10 15 Q20 5, 30 15 T50 15 T70 5 T90 25 T110 10 T130 20 T150 15 T170 5 T190 15"
-                                        fill="none"
-                                        stroke="#c084fc"
-                                        strokeWidth="2.5"
-                                        strokeLinecap="round"
-                                      />
-                                    </svg>
-                                    <div className="audio-controls">
-                                      <span className="play-btn">
-                                        <Play size={12} fill="currentColor" />
-                                      </span>
-                                      <span className="audio-time">06:24</span>
-                                      <MoreHorizontal size={14} className="audio-more" />
+                                <div className="card-snippet-box">
+                                  {isAudio ? (
+                                    <div className="audio-preview-widget">
+                                      <svg className="waveform-svg" viewBox="0 0 200 30">
+                                        <path
+                                          d="M10 15 Q20 5, 30 15 T50 15 T70 5 T90 25 T110 10 T130 20 T150 15 T170 5 T190 15"
+                                          fill="none"
+                                          stroke="#c084fc"
+                                          strokeWidth="2.5"
+                                          strokeLinecap="round"
+                                        />
+                                      </svg>
+                                      <div className="audio-controls">
+                                        <span className="play-btn">
+                                          <Play size={12} fill="currentColor" />
+                                        </span>
+                                        <span className="audio-time">06:24</span>
+                                        <MoreHorizontal size={14} className="audio-more" />
+                                      </div>
                                     </div>
-                                  </div>
-                                ) : isCanvas ? (
-                                  <div className="diagram-preview-widget">
-                                    <div className="diagram-node">Client</div>
-                                    <span className="diagram-arrow">→</span>
-                                    <div className="diagram-node highlight">API Gateway</div>
-                                    <span className="diagram-arrow">→</span>
-                                    <div className="diagram-node group">
-                                      <div className="micro-box" />
-                                      <div className="micro-box" />
-                                      <div className="micro-box" />
+                                  ) : isCanvas ? (
+                                    <div className="diagram-preview-widget">
+                                      <div className="diagram-node">Client</div>
+                                      <span className="diagram-arrow">→</span>
+                                      <div className="diagram-node highlight">API Gateway</div>
+                                      <span className="diagram-arrow">→</span>
+                                      <div className="diagram-node group">
+                                        <div className="micro-box" />
+                                        <div className="micro-box" />
+                                        <div className="micro-box" />
+                                      </div>
                                     </div>
-                                  </div>
-                                ) : (
-                                  <p className="text-snippet">{getNoteSnippet(n)}</p>
-                                )}
+                                  ) : (
+                                    <p className="text-snippet">{getNoteSnippet(n)}</p>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                            );
+                          })}
+                        </div>
+                        <div className="folder-quick-actions">
+                          <button
+                            className="btn-secondary-flat compact"
+                            onClick={() => onCreateNote('document', 'blank', false, folder.id)}
+                          >
+                            <Plus size={13} /> Note
+                          </button>
+                          <button
+                            className="btn-secondary-flat compact"
+                            onClick={() => onCreateNote('canvas', 'blank', false, folder.id)}
+                          >
+                            <Plus size={13} /> Canvas
+                          </button>
+                          <button
+                            className="btn-secondary-flat compact"
+                            onClick={() => onCreateNote('document', 'audio', false, folder.id)}
+                          >
+                            <Plus size={13} /> Audio note
+                          </button>
+                        </div>
+                      </>
                     ) : (
-                      <p className="empty-space-text">No files in this space yet.</p>
+                      <div className="empty-space-box">
+                        <p className="empty-space-text">No files in this space yet.</p>
+                        <div className="empty-space-actions">
+                          <button
+                            className="btn-secondary-flat"
+                            onClick={() => onCreateNote('document', 'blank', false, folder.id)}
+                          >
+                            <FileText size={14} /> + Note
+                          </button>
+                          <button
+                            className="btn-secondary-flat"
+                            onClick={() => onCreateNote('canvas', 'blank', false, folder.id)}
+                          >
+                            <PenLine size={14} /> + Canvas
+                          </button>
+                          <button
+                            className="btn-secondary-flat"
+                            onClick={() => onCreateNote('document', 'audio', false, folder.id)}
+                          >
+                            <Mic size={14} /> + Audio note
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}

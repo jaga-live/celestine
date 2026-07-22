@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Command, FileText, Folder, Hash, LayoutTemplate, Search, Settings } from 'lucide-react';
+import {
+  Command,
+  FileText,
+  Folder,
+  Hash,
+  LayoutTemplate,
+  Mic,
+  PenLine,
+  Search,
+  Settings,
+} from 'lucide-react';
 import type { Folder as FolderType, Note, Tag } from '../types';
 
 interface CommandPaletteProps {
@@ -12,6 +22,7 @@ interface CommandPaletteProps {
   onOpenTemplates: () => void;
   onOpenSettings: () => void;
   onQuickNote: () => void;
+  onAudioNote?: () => void;
 }
 
 const noteText = (note: Note) =>
@@ -37,6 +48,7 @@ export function CommandPalette({
   onOpenTemplates,
   onOpenSettings,
   onQuickNote,
+  onAudioNote,
 }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
@@ -84,8 +96,15 @@ export function CommandPalette({
           id: 'quick-note',
           label: 'Create quick note',
           group: 'Commands',
-          icon: Command,
+          icon: FileText,
           action: onQuickNote,
+        },
+        {
+          id: 'audio-note',
+          label: 'Record audio note',
+          group: 'Commands',
+          icon: Mic,
+          action: () => (onAudioNote ? onAudioNote() : onQuickNote()),
         },
         {
           id: 'settings',
