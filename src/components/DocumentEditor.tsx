@@ -24,6 +24,7 @@ import {
   Table2,
   Undo2,
 } from 'lucide-react';
+import { smoothStrokePoints } from '../lib/strokeSmoothing';
 import type { CanvasPattern, DocumentPage, InkStroke, Note, Point, Settings, Tool } from '../types';
 import { RichTextSlashMenu } from './RichTextSlashMenu';
 import { TextStyleMark } from '../lib/tiptapTextStyle';
@@ -85,8 +86,7 @@ export function DocumentEditor({
 }: DocumentEditorProps) {
   const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
   const [paperMenuOpen, setPaperMenuOpen] = useState(false);
-
-  const [documentZoom, setDocumentZoom] = useState(1.28);
+  const [documentZoom, setDocumentZoom] = useState(1);
   const wordCount = useMemo(() => {
     const text = note.pages.map((p) => p.html.replace(/<[^>]*>/g, ' ')).join(' ');
     return text.trim().split(/\s+/).filter(Boolean).length;
@@ -148,12 +148,12 @@ export function DocumentEditor({
     <section
       className={`document-editor tool-${tool}`}
       onPointerEnter={(event) => {
-        if (event.pointerType === 'pen' && tool !== 'pen') {
+        if (event.pointerType === 'pen' && tool !== 'pen' && tool !== 'highlighter' && tool !== 'eraser') {
           onPenDetected();
         }
       }}
       onPointerMove={(event) => {
-        if (event.pointerType === 'pen' && tool !== 'pen') {
+        if (event.pointerType === 'pen' && tool !== 'pen' && tool !== 'highlighter' && tool !== 'eraser') {
           onPenDetected();
         }
       }}
@@ -449,6 +449,8 @@ function DocumentPageEditor({
 
   const light = isLightColor(paperColor);
 
+  const isDrawingTool = tool === 'pen' || tool === 'highlighter' || tool === 'eraser';
+
   return (
     <article
       className="document-page"
@@ -463,7 +465,14 @@ function DocumentPageEditor({
       }
     >
       <div className="document-page-number">{pageNumber}</div>
-      <EditorContent editor={editor} className="document-rich-text" />
+      <EditorContent
+        editor={editor}
+        className="document-rich-text"
+        style={{
+          userSelect: isDrawingTool ? 'none' : 'text',
+          WebkitUserSelect: isDrawingTool ? 'none' : 'text',
+        }}
+      />
       <DocumentInkLayer page={page} tool={tool} settings={settings} onChange={onChange} />
     </article>
   );
@@ -532,13 +541,14 @@ function DocumentInkLayer({
   };
 
   const eraseAt = (point: Point) => {
+    const radius = settings.eraserSize || 24;
     const nextObjects = pageRef.current.objects.filter((object) => {
       if (object.type !== 'stroke') {
         return true;
       }
 
       return !object.points.some(
-        (strokePoint) => Math.hypot(strokePoint.x - point.x, strokePoint.y - point.y) <= 14,
+        (strokePoint) => Math.hypot(strokePoint.x - point.x, strokePoint.y - point.y) <= radius,
       );
     });
 
@@ -563,15 +573,22 @@ function DocumentInkLayer({
       return;
     }
 
-    const baseColor = settings.penColor.startsWith('#') ? settings.penColor : '#f19b3f';
-    const strokeColor = tool === 'highlighter' ? `${baseColor.slice(0, 7)}66` : settings.penColor;
+    const strokeColor =
+      tool === 'highlighter'
+        ? `${(settings.highlighterColor || '#f19b3f').slice(0, 7)}66`
+        : settings.penColor;
+
+    const strokeWidth =
+      tool === 'highlighter'
+        ? (settings.highlighterSize || 18)
+        : (settings.penSize || 3.2);
 
     workingStroke.current = {
       id: makeId('stroke'),
       type: 'stroke',
       points: [point],
       color: strokeColor,
-      width: tool === 'highlighter' ? 18 : 3.2,
+      width: strokeWidth,
       isHighlighter: tool === 'highlighter',
       createdAt: Date.now(),
     };
@@ -602,12 +619,14 @@ function DocumentInkLayer({
     }
 
     stroke.points.push(point);
-    const context = liveCanvasRef.current?.getContext('2d');
+    const liveCanvas = liveCanvasRef.current;
+    const context = liveCanvas?.getContext('2d');
 
-    if (context) {
+    if (context && liveCanvas) {
       const ratio = window.devicePixelRatio || 1;
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
-      drawStroke(context, { ...stroke, points: [previous, point] }, settings.pressureWidth);
+      context.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
+      drawStroke(context, stroke, settings.pressureWidth);
     }
   };
 
@@ -626,9 +645,10 @@ function DocumentInkLayer({
     }
 
     if (stroke && stroke.points.length > 1) {
+      const finalStroke = smoothStrokePoints(stroke);
       const nextPage = {
         ...pageRef.current,
-        objects: [...pageRef.current.objects, stroke],
+        objects: [...pageRef.current.objects, finalStroke],
       };
 
       pageRef.current = nextPage;
@@ -658,30 +678,32 @@ function drawStroke(context: CanvasRenderingContext2D, stroke: InkStroke, pressu
 
   context.save();
   if (stroke.isHighlighter) {
-    context.globalCompositeOperation = 'multiply';
     context.strokeStyle = stroke.color;
-    context.lineCap = 'square';
-    context.lineJoin = 'miter';
+    context.lineCap = 'round';
+    context.lineJoin = 'round';
+    context.lineWidth = stroke.width;
+    context.beginPath();
+    context.moveTo(stroke.points[0].x, stroke.points[0].y);
+    for (let index = 1; index < stroke.points.length; index += 1) {
+      context.lineTo(stroke.points[index].x, stroke.points[index].y);
+    }
+    context.stroke();
   } else {
     context.strokeStyle = stroke.color;
     context.lineCap = 'round';
     context.lineJoin = 'round';
-  }
 
-  for (let index = 1; index < stroke.points.length; index += 1) {
-    const previous = stroke.points[index - 1];
-    const current = stroke.points[index];
-    const pressure = stroke.isHighlighter
-      ? 0.5
-      : pressureWidth
-        ? (previous.pressure + current.pressure) / 2
-        : 0.5;
+    for (let index = 1; index < stroke.points.length; index += 1) {
+      const previous = stroke.points[index - 1];
+      const current = stroke.points[index];
+      const pressure = pressureWidth ? (previous.pressure + current.pressure) / 2 : 0.5;
 
-    context.lineWidth = stroke.isHighlighter ? stroke.width : stroke.width * (0.45 + pressure * 1.2);
-    context.beginPath();
-    context.moveTo(previous.x, previous.y);
-    context.lineTo(current.x, current.y);
-    context.stroke();
+      context.lineWidth = stroke.width * (0.45 + pressure * 1.2);
+      context.beginPath();
+      context.moveTo(previous.x, previous.y);
+      context.lineTo(current.x, current.y);
+      context.stroke();
+    }
   }
 
   context.restore();

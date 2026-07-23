@@ -27,6 +27,7 @@ interface TextCardProps {
   object: TextObject;
   selected: boolean;
   camera: { x: number; y: number; zoom: number };
+  tool?: string;
   onSelect: () => void;
   onChange: (html: string) => void;
   onDelete: () => void;
@@ -38,10 +39,12 @@ export function TextCard({
   object,
   selected,
   camera,
+  tool,
   onSelect,
   onChange,
   onDelete,
 }: TextCardProps) {
+  const isDrawingTool = tool === 'pen' || tool === 'highlighter' || tool === 'eraser' || tool === 'shape';
 
   const editor = useEditor({
     extensions: [
@@ -85,6 +88,8 @@ export function TextCard({
     maxWidth: 720,
     minWidth: 48,
     transform: `translate(${camera.x + object.x * camera.zoom}px, ${camera.y + object.y * camera.zoom}px) scale(${camera.zoom})`,
+    pointerEvents: isDrawingTool ? ('none' as const) : ('auto' as const),
+    userSelect: isDrawingTool ? ('none' as const) : ('text' as const),
   };
 
   return (
@@ -92,6 +97,9 @@ export function TextCard({
       className={`${selected ? 'text-card selected' : 'text-card'}${object.textStyle === 'handwriting' ? ` handwriting-text font-${object.handwritingFont ?? 'chalkboard'}` : ''}`}
       style={style}
       onPointerDown={(event) => {
+        if (isDrawingTool) {
+          return;
+        }
         event.stopPropagation();
         onSelect();
       }}

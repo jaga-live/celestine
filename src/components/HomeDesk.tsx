@@ -14,8 +14,6 @@ import {
   GitBranch,
   Mic2,
   NotebookPen,
-  PanelRightClose,
-  PanelRightOpen,
   PenLine,
   Plus,
   Search,
@@ -370,18 +368,6 @@ export function HomeDesk({
               </div>
             ) : null}
           </div>
-          <button
-            className="utility-toggle"
-            onClick={onToggleUtilityPanel}
-            aria-label={settings.utilityPanelVisible ? 'Hide utility panel' : 'Show utility panel'}
-            title={settings.utilityPanelVisible ? 'Hide utility panel' : 'Show utility panel'}
-          >
-            {settings.utilityPanelVisible ? (
-              <PanelRightClose size={17} />
-            ) : (
-              <PanelRightOpen size={17} />
-            )}
-          </button>
         </div>
       </header>
       <div className={`celestine-content ${settings.utilityPanelVisible ? '' : 'utility-hidden'}`}>
@@ -457,11 +443,15 @@ export function HomeDesk({
               <div className="workspace-card-grid">
                 {recent.slice(0, 4).map((note) => {
                   const folder = folders.find((item) => item.id === note.folderId);
+                  const isAudio = Boolean(note.audioDataUrl || note.captureKind === 'audio');
+                  const noteType = isAudio ? 'audio' : note.mode === 'canvas' ? 'canvas' : 'document';
+                  const noteTypeLabel = noteType === 'audio' ? 'Audio' : noteType === 'canvas' ? 'Canvas' : 'Document';
+
                   return (
                     <article className="workspace-preview-card" key={note.id}>
                       <button className="card-open" onClick={() => onOpenNote(note.id)}>
                         <span className="real-note-preview">
-                          <strong>{note.mode === 'canvas' ? 'Canvas' : 'Document'}</strong>
+                          <strong className={`note-type-heading type-${noteType}`}>{noteTypeLabel}</strong>
                           <p>{notePreview(note) || 'This note is ready for your next idea.'}</p>
                         </span>
                         <span className="workspace-card-copy">

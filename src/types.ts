@@ -128,7 +128,14 @@ export interface ShortcutMap {
 export interface Settings {
   theme: Theme;
   penColor: string;
+  highlighterColor: string;
+  shapeColor: string;
+  textColor: string;
+  penSize?: number;
+  highlighterSize?: number;
+  eraserSize?: number;
   pressureWidth: boolean;
+  autoCorrectShapes?: boolean;
   conversionMode: HandwritingConversion;
   conversionDelayMs: number;
   handwritingFont: HandwritingFont;

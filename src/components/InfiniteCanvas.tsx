@@ -9,8 +9,11 @@ import {
   Minus,
   Plus,
   Redo2,
+  Trash2,
   Undo2,
 } from 'lucide-react';
+import { detectShapeFromStroke } from '../lib/shapeRecognition';
+import { smoothStrokePoints } from '../lib/strokeSmoothing';
 import type {
   Camera,
   CanvasPattern,
@@ -210,6 +213,21 @@ export function InfiniteCanvas({
   const panOrigin = useRef<ScreenPoint | null>(null);
   const cameraOrigin = useRef<Camera | null>(null);
   const imagePlacement = useRef<Point | null>(null);
+  const movingObjectState = useRef<{
+    id: string;
+    startWorld: Point;
+    initialX: number;
+    initialY: number;
+  } | null>(null);
+  const resizingHandleState = useRef<{
+    id: string;
+    handle: 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+    startWorld: Point;
+    initialX: number;
+    initialY: number;
+    initialWidth: number;
+    initialHeight: number;
+  } | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const pointerPressure = useRef(0);
   const [shapeDraft, setShapeDraft] = useState<ShapeDraft | null>(null);
@@ -319,6 +337,9 @@ export function InfiniteCanvas({
       } else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'y') {
         event.preventDefault();
         handleRedo();
+      } else if (selectedObjectId && (event.key === 'Delete' || event.key === 'Backspace')) {
+        event.preventDefault();
+        removeObject(selectedObjectId);
       }
     };
     const keyUp = (event: KeyboardEvent) => {
@@ -569,7 +590,7 @@ export function InfiniteCanvas({
   };
 
   const eraseAtPoint = (point: Point) => {
-    const radius = 14 / camera.zoom;
+    const radius = (settings.eraserSize || 24) / camera.zoom;
     const nextObjects = noteRef.current.objects.filter(
       (object) => object.type !== 'stroke' || !hitStroke(object, point, radius),
     );
@@ -599,16 +620,74 @@ export function InfiniteCanvas({
       return;
     }
 
+    if (tool === 'select') {
+      const objects = noteRef.current.objects;
+      let matchedId: string | null = null;
+      for (let i = objects.length - 1; i >= 0; i--) {
+        const obj = objects[i];
+        if (obj.type === 'shape' || obj.type === 'image') {
+          const minX = Math.min(obj.x, obj.x + obj.width);
+          const maxX = Math.max(obj.x, obj.x + obj.width);
+          const minY = Math.min(obj.y, obj.y + obj.height);
+          const maxY = Math.max(obj.y, obj.y + obj.height);
+          const pad = 10;
+          if (
+            worldPoint.x >= minX - pad &&
+            worldPoint.x <= maxX + pad &&
+            worldPoint.y >= minY - pad &&
+            worldPoint.y <= maxY + pad
+          ) {
+            matchedId = obj.id;
+            movingObjectState.current = {
+              id: obj.id,
+              startWorld: worldPoint,
+              initialX: obj.x,
+              initialY: obj.y,
+            };
+            break;
+          }
+        } else if (obj.type === 'text') {
+          const pad = 8;
+          if (
+            worldPoint.x >= obj.x - pad &&
+            worldPoint.x <= obj.x + obj.width + pad &&
+            worldPoint.y >= obj.y - pad &&
+            worldPoint.y <= obj.y + 250 + pad
+          ) {
+            matchedId = obj.id;
+            movingObjectState.current = {
+              id: obj.id,
+              startWorld: worldPoint,
+              initialX: obj.x,
+              initialY: obj.y,
+            };
+            break;
+          }
+        }
+      }
+      setSelectedObjectId(matchedId);
+      if (matchedId) {
+        return;
+      }
+    }
+
     if (tool === 'pen' || tool === 'highlighter') {
-      const baseColor = settings.penColor.startsWith('#') ? settings.penColor : '#f19b3f';
-      const strokeColor = tool === 'highlighter' ? `${baseColor.slice(0, 7)}66` : settings.penColor;
+      const strokeColor =
+        tool === 'highlighter'
+          ? `${(settings.highlighterColor || '#f19b3f').slice(0, 7)}66`
+          : settings.penColor;
+
+      const strokeWidth =
+        tool === 'highlighter'
+          ? (settings.highlighterSize || 18)
+          : (settings.penSize || 3.2);
 
       workingStroke.current = {
         id: makeId('stroke'),
         type: 'stroke',
         points: [worldPoint],
         color: strokeColor,
-        width: tool === 'highlighter' ? 18 : 3.2,
+        width: strokeWidth,
         isHighlighter: tool === 'highlighter',
         createdAt: Date.now(),
       };
@@ -636,7 +715,7 @@ export function InfiniteCanvas({
         type: 'text',
         x: worldPoint.x,
         y: worldPoint.y,
-        width: 420,
+        width: 240,
         html: '<p></p>',
         createdAt: Date.now(),
       };
@@ -661,7 +740,7 @@ export function InfiniteCanvas({
   };
 
   const handlePointerMove = (event: React.PointerEvent) => {
-    if (event.pointerType === 'pen' && tool !== 'pen') {
+    if (event.pointerType === 'pen' && tool !== 'pen' && tool !== 'highlighter' && tool !== 'eraser') {
       onPenDetected();
     }
 
@@ -670,7 +749,9 @@ export function InfiniteCanvas({
       !panning.current &&
       !workingStroke.current &&
       !shapeDraft &&
-      !selectionDraft
+      !selectionDraft &&
+      !movingObjectState.current &&
+      !resizingHandleState.current
     ) {
       updatePointerUi(0);
 
@@ -681,6 +762,60 @@ export function InfiniteCanvas({
     const physicalPoint = eventWorldPoint(event);
 
     updatePointerUi(event.buttons ? physicalPoint.pressure : 0);
+
+    if (resizingHandleState.current) {
+      const state = resizingHandleState.current;
+      const deltaX = physicalPoint.x - state.startWorld.x;
+      const deltaY = physicalPoint.y - state.startWorld.y;
+
+      let nextX = state.initialX;
+      let nextY = state.initialY;
+      let nextWidth = state.initialWidth;
+      let nextHeight = state.initialHeight;
+
+      if (state.handle.includes('e')) nextWidth = Math.max(20, state.initialWidth + deltaX);
+      if (state.handle.includes('s')) nextHeight = Math.max(20, state.initialHeight + deltaY);
+      if (state.handle.includes('w')) {
+        const calcW = state.initialWidth - deltaX;
+        if (calcW > 20) {
+          nextWidth = calcW;
+          nextX = state.initialX + deltaX;
+        }
+      }
+      if (state.handle.includes('n')) {
+        const calcH = state.initialHeight - deltaY;
+        if (calcH > 20) {
+          nextHeight = calcH;
+          nextY = state.initialY + deltaY;
+        }
+      }
+
+      replaceObjects(
+        noteRef.current.objects.map((obj) =>
+          obj.id === state.id
+            ? ({ ...obj, x: nextX, y: nextY, width: nextWidth, height: nextHeight } as CanvasObject)
+            : obj,
+        ),
+        false,
+      );
+      return;
+    }
+
+    if (movingObjectState.current) {
+      const state = movingObjectState.current;
+      const deltaX = physicalPoint.x - state.startWorld.x;
+      const deltaY = physicalPoint.y - state.startWorld.y;
+
+      replaceObjects(
+        noteRef.current.objects.map((obj) =>
+          obj.id === state.id
+            ? ({ ...obj, x: state.initialX + deltaX, y: state.initialY + deltaY } as CanvasObject)
+            : obj,
+        ),
+        false,
+      );
+      return;
+    }
 
     if (panning.current && panOrigin.current && cameraOrigin.current) {
       updateCamera({
@@ -709,10 +844,11 @@ export function InfiniteCanvas({
       };
       const liveContext = liveCanvasRef.current?.getContext('2d');
 
-      if (liveContext) {
+      if (liveContext && liveCanvasRef.current) {
+        liveContext.clearRect(0, 0, liveCanvasRef.current.width, liveCanvasRef.current.height);
         drawStrokeSegment(
           liveContext,
-          [previousPoint, ...samples],
+          workingStroke.current.points,
           workingStroke.current,
           camera,
           settings.pressureWidth,
@@ -739,8 +875,34 @@ export function InfiniteCanvas({
     }
   };
 
+  const handleResizeStart = (
+    event: React.PointerEvent,
+    handle: 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w',
+    object: ShapeObject | TextObject | ImageObject,
+  ) => {
+    event.stopPropagation();
+    event.preventDefault();
+    rootRef.current?.setPointerCapture(event.pointerId);
+    const worldPoint = eventWorldPoint(event);
+    resizingHandleState.current = {
+      handle,
+      id: object.id,
+      startWorld: worldPoint,
+      initialX: object.x,
+      initialY: object.y,
+      initialWidth: 'width' in object ? object.width : 100,
+      initialHeight: 'height' in object ? object.height : 100,
+    };
+  };
+
   const handlePointerUp = (event: React.PointerEvent) => {
     const finishedStroke = workingStroke.current;
+
+    if (movingObjectState.current || resizingHandleState.current) {
+      movingObjectState.current = null;
+      resizingHandleState.current = null;
+      replaceObjects(noteRef.current.objects, true);
+    }
 
     rootRef.current?.releasePointerCapture(event.pointerId);
     panning.current = false;
@@ -762,7 +924,14 @@ export function InfiniteCanvas({
     }
 
     if (finishedStroke && finishedStroke.points.length > 1) {
-      replaceObjects([...noteRef.current.objects, finishedStroke]);
+      const smoothed = smoothStrokePoints(finishedStroke);
+      const autoCorrect = settings.autoCorrectShapes ?? false;
+      const detectedShape = autoCorrect && tool === 'pen' ? detectShapeFromStroke(smoothed) : null;
+      if (detectedShape) {
+        replaceObjects([...noteRef.current.objects, detectedShape]);
+      } else {
+        replaceObjects([...noteRef.current.objects, smoothed]);
+      }
     }
 
     if (finishedStroke && settings.conversionMode === 'after-delay') {
@@ -791,7 +960,7 @@ export function InfiniteCanvas({
           selectedShapeType === 'arrow' || selectedShapeType === 'line'
             ? shapeDraft.end.y - shapeDraft.start.y
             : Math.abs(shapeDraft.end.y - shapeDraft.start.y),
-        color: settings.penColor,
+        color: settings.shapeColor || '#4c9bff',
         createdAt: Date.now(),
       };
 
@@ -860,6 +1029,8 @@ export function InfiniteCanvas({
     event.target.value = '';
   };
 
+  const textEditTimer = useRef<number | null>(null);
+
   const updateTextObject = (id: string, html: string) => {
     const hasContent = hasTextContent(html);
 
@@ -870,10 +1041,22 @@ export function InfiniteCanvas({
       return;
     }
 
+    if (textEditTimer.current) {
+      window.clearTimeout(textEditTimer.current);
+    } else {
+      setUndoStack((stack) => [...stack.slice(-50), noteRef.current.objects]);
+      setRedoStack([]);
+    }
+
+    textEditTimer.current = window.setTimeout(() => {
+      textEditTimer.current = null;
+    }, 1200);
+
     replaceObjects(
       noteRef.current.objects.map((object) =>
         object.id === id ? { ...object, html } : object,
       ) as CanvasObject[],
+      false,
     );
   };
 
@@ -894,6 +1077,8 @@ export function InfiniteCanvas({
     });
   };
 
+  const selectedObject = note.objects.find((object) => object.id === selectedObjectId);
+
   return (
     <div
       ref={rootRef}
@@ -910,7 +1095,7 @@ export function InfiniteCanvas({
       }
       onPointerDown={handlePointerDown}
       onPointerEnter={(event) => {
-        if (event.pointerType === 'pen' && tool !== 'pen') {
+        if (event.pointerType === 'pen' && tool !== 'pen' && tool !== 'highlighter' && tool !== 'eraser') {
           onPenDetected();
         }
       }}
@@ -976,13 +1161,10 @@ export function InfiniteCanvas({
                         className={note.canvasColor === color ? 'active' : ''}
                         style={{ backgroundColor: color }}
                         onClick={() => updateSurface({ canvasColor: color })}
-                        aria-label={`Canvas color ${color}`}
-                      >
-                        {note.canvasColor === color ? <Check size={12} /> : null}
-                      </button>
+                      />
                     ))}
                   </div>
-                  <p>Layout</p>
+                  <p>Pattern</p>
                   <div className="paper-pattern-row">
                     {canvasPatterns.map((pattern) => (
                       <button
@@ -990,7 +1172,6 @@ export function InfiniteCanvas({
                         className={note.canvasPattern === pattern.id ? 'active' : ''}
                         onClick={() => updateSurface({ canvasPattern: pattern.id })}
                       >
-                        <span className={`pattern-preview ${pattern.id}`} />
                         {pattern.label}
                       </button>
                     ))}
@@ -1022,12 +1203,53 @@ export function InfiniteCanvas({
               object={object}
               selected={selectedObjectId === object.id}
               camera={camera}
+              tool={tool}
               onSelect={() => setSelectedObjectId(object.id)}
               onChange={(html) => updateTextObject(object.id, html)}
               onDelete={() => removeObject(object.id)}
             />
           ) : null,
         )}
+        {selectedObject && (selectedObject.type === 'shape' || selectedObject.type === 'image') ? (
+          <div
+            className="canvas-selection-box is-moving"
+            style={{
+              transform: `translate(${camera.x + Math.min(selectedObject.x, selectedObject.x + selectedObject.width) * camera.zoom}px, ${camera.y + Math.min(selectedObject.y, selectedObject.y + selectedObject.height) * camera.zoom}px)`,
+              width: Math.abs(selectedObject.width) * camera.zoom,
+              height: Math.abs(selectedObject.height) * camera.zoom,
+            }}
+            onPointerDown={(e) => {
+              if (tool === 'select') {
+                e.stopPropagation();
+                const worldPoint = eventWorldPoint(e);
+                movingObjectState.current = {
+                  id: selectedObject.id,
+                  startWorld: worldPoint,
+                  initialX: selectedObject.x,
+                  initialY: selectedObject.y,
+                };
+              }
+            }}
+          >
+            <div className="selection-actions-bar" onPointerDown={(e) => e.stopPropagation()}>
+              <button
+                className="selection-action-btn"
+                onClick={() => removeObject(selectedObject.id)}
+                title="Delete shape (Delete / Backspace)"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+
+            {(['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const).map((handle) => (
+              <div
+                key={handle}
+                className={`resize-handle ${handle}`}
+                onPointerDown={(e) => handleResizeStart(e, handle, selectedObject)}
+              />
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {!note.objects.length ? (
@@ -1132,7 +1354,7 @@ function drawCanvas(
         selectedShapeType === 'arrow' || selectedShapeType === 'line'
           ? draft.end.y - draft.start.y
           : Math.abs(draft.end.y - draft.start.y),
-      color: '#d46a61',
+      color: settings.shapeColor || '#d46a61',
       createdAt: Date.now(),
     });
   }
@@ -1215,10 +1437,9 @@ function drawStroke(context: CanvasRenderingContext2D, stroke: InkStroke, pressu
 
   context.save();
   if (stroke.isHighlighter) {
-    context.globalCompositeOperation = 'multiply';
     context.strokeStyle = stroke.color;
-    context.lineCap = 'square';
-    context.lineJoin = 'miter';
+    context.lineCap = 'round';
+    context.lineJoin = 'round';
   } else {
     context.strokeStyle = stroke.color;
     context.lineCap = 'round';

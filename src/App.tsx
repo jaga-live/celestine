@@ -4,6 +4,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { defaultWorkspace } from './data/defaultWorkspace';
 import { DocumentEditor } from './components/DocumentEditor';
 import { EditorHeader } from './components/EditorHeader';
+import { EditorSettingsModal } from './components/EditorSettingsModal';
 import { InfiniteCanvas } from './components/InfiniteCanvas';
 import { NotesList } from './components/NotesList';
 import { SettingsPanel } from './components/SettingsPanel';
@@ -82,6 +83,7 @@ export default function App() {
   const [libraryVisible, setLibraryVisible] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [editorSettingsOpen, setEditorSettingsOpen] = useState(false);
   const [homeOpen, setHomeOpen] = useState(true);
   const [dashboardView, setDashboardView] = useState<'home' | 'templates' | 'project'>('home');
   const [commandOpen, setCommandOpen] = useState(false);
@@ -1559,10 +1561,25 @@ export default function App() {
                 mode={activeNote.mode}
                 settings={workspace.settings}
                 onToolChange={setTool}
-                onColorChange={(penColor) => updateSettings({ ...workspace.settings, penColor })}
+                onColorChange={(color) => {
+                  const updates = { ...workspace.settings };
+                  if (tool === 'highlighter') updates.highlighterColor = color;
+                  else if (tool === 'shape') updates.shapeColor = color;
+                  else if (tool === 'text') updates.textColor = color;
+                  else updates.penColor = color;
+                  updateSettings(updates);
+                }}
                 onShapeChange={(selectedShape) =>
                   updateSettings({ ...workspace.settings, selectedShape })
                 }
+                onSizeChange={(size) => {
+                  const updates = { ...workspace.settings };
+                  if (tool === 'highlighter') updates.highlighterSize = size;
+                  else if (tool === 'eraser') updates.eraserSize = size;
+                  else updates.penSize = size;
+                  updateSettings(updates);
+                }}
+                onOpenSettings={() => setEditorSettingsOpen(true)}
               />
             </DocumentEditor>
           ) : (
@@ -1654,16 +1671,38 @@ export default function App() {
                   mode={activeNote.mode}
                   settings={workspace.settings}
                   onToolChange={setTool}
-                  onColorChange={(penColor) => updateSettings({ ...workspace.settings, penColor })}
+                  onColorChange={(color) => {
+                    const updates = { ...workspace.settings };
+                    if (tool === 'highlighter') updates.highlighterColor = color;
+                    else if (tool === 'shape') updates.shapeColor = color;
+                    else if (tool === 'text') updates.textColor = color;
+                    else updates.penColor = color;
+                    updateSettings(updates);
+                  }}
                   onShapeChange={(selectedShape) =>
                     updateSettings({ ...workspace.settings, selectedShape })
                   }
+                  onSizeChange={(size) => {
+                    const updates = { ...workspace.settings };
+                    if (tool === 'highlighter') updates.highlighterSize = size;
+                    else if (tool === 'eraser') updates.eraserSize = size;
+                    else updates.penSize = size;
+                    updateSettings(updates);
+                  }}
+                  onOpenSettings={() => setEditorSettingsOpen(true)}
                 />
               </InfiniteCanvas>
             </>
           )}
         </section>
       )}
+
+      <EditorSettingsModal
+        settings={workspace.settings}
+        isOpen={editorSettingsOpen}
+        onClose={() => setEditorSettingsOpen(false)}
+        onUpdateSettings={updateSettings}
+      />
 
       {settingsOpen ? (
         <SettingsPanel

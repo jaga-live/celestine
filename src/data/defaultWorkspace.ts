@@ -56,6 +56,12 @@ export const defaultWorkspace: Workspace = {
   settings: {
     theme: 'dark',
     penColor: '#4c9bff',
+    highlighterColor: '#f19b3f',
+    shapeColor: '#4c9bff',
+    textColor: '#ffffff',
+    penSize: 3.2,
+    highlighterSize: 18,
+    eraserSize: 24,
     pressureWidth: true,
     conversionMode: 'manual',
     conversionDelayMs: 2500,

@@ -110,6 +110,9 @@ const migrateWorkspace = (workspace: Workspace): Workspace => {
         !workspace.settings.penColor || workspace.settings.penColor === '#eceef3'
           ? '#4c9bff'
           : (legacyColors[workspace.settings.penColor] ?? workspace.settings.penColor),
+      highlighterColor: workspace.settings.highlighterColor ?? '#f19b3f',
+      shapeColor: workspace.settings.shapeColor ?? '#4c9bff',
+      textColor: workspace.settings.textColor ?? '#ffffff',
       pressureWidth: workspace.settings.pressureWidth ?? true,
       conversionMode: workspace.settings.conversionMode ?? 'manual',
       conversionDelayMs: workspace.settings.conversionDelayMs ?? 2500,

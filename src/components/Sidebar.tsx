@@ -188,33 +188,28 @@ export function Sidebar({
 
         {folders
           .filter((folder) => folder.id !== 'inbox' && !folder.parentId)
-          .map((folder) => {
-            const childFolders = folders.filter((child) => child.parentId === folder.id);
-
-            return (
-              <ProjectItemRow
-                key={folder.id}
-                folder={folder}
-                childFolders={childFolders}
-                filter={filter}
-                onFilterChange={onFilterChange}
-                onCreateProjectFolder={onCreateProjectFolder}
-                onEditFolder={(f) => {
-                  setEditingFolder(f);
-                  setEditName(f.name);
-                  setEditColor(f.color);
-                  setEditSecondary(f.secondaryColor || getSecondaryColor(f.color));
-                }}
-                onChangeFolderIcon={onChangeFolderIcon}
-                onDuplicateFolder={onDuplicateFolder}
-                onDeleteFolder={onDeleteFolder}
-                collapsed={collapsed}
-                onViewChange={onViewChange}
-                onRenameFolder={onRenameFolder}
-                onRecolorFolder={onRecolorFolder}
-              />
-            );
-          })}
+          .map((folder) => (
+            <ProjectItemRow
+              key={folder.id}
+              folder={folder}
+              filter={filter}
+              onFilterChange={onFilterChange}
+              onCreateProjectFolder={onCreateProjectFolder}
+              onEditFolder={(f) => {
+                setEditingFolder(f);
+                setEditName(f.name);
+                setEditColor(f.color);
+                setEditSecondary(f.secondaryColor || getSecondaryColor(f.color));
+              }}
+              onChangeFolderIcon={onChangeFolderIcon}
+              onDuplicateFolder={onDuplicateFolder}
+              onDeleteFolder={onDeleteFolder}
+              collapsed={collapsed}
+              onViewChange={onViewChange}
+              onRenameFolder={onRenameFolder}
+              onRecolorFolder={onRecolorFolder}
+            />
+          ))}
       </nav>
 
       <div className="sidebar-footer">
@@ -331,7 +326,6 @@ export function Sidebar({
 
 function ProjectItemRow({
   folder,
-  childFolders,
   filter,
   onFilterChange,
   onCreateProjectFolder,
@@ -345,10 +339,9 @@ function ProjectItemRow({
   onRecolorFolder,
 }: {
   folder: FolderType;
-  childFolders: FolderType[];
   filter: LibraryFilter;
   onFilterChange: (filter: LibraryFilter) => void;
-  onCreateProjectFolder: (id: string) => void;
+  onCreateProjectFolder: (parentId: string) => void;
   onEditFolder: (folder: FolderType) => void;
   onChangeFolderIcon: (id: string) => void;
   onDuplicateFolder: (id: string) => void;
@@ -415,7 +408,7 @@ function ProjectItemRow({
             <LiquidOrb
               primaryColor={folder.color || '#3b82f6'}
               secondaryColor={folder.secondaryColor}
-              size={18}
+              size={collapsed ? 22 : 18}
             />
           )}
           {collapsed ? null : <span className="folder-label">{folder.name}</span>}
@@ -441,14 +434,6 @@ function ProjectItemRow({
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              onClick={() => {
-                onCreateProjectFolder(folder.id);
-                setMenuCoords(null);
-              }}
-            >
-              New folder
-            </button>
             <button
               onClick={() => {
                 onEditFolder(folder);
@@ -485,24 +470,6 @@ function ProjectItemRow({
           </div>
         ) : null}
       </div>
-
-      {!collapsed && childFolders.length > 0 && (
-        <div className="child-folders-tree">
-          {childFolders.map((child) => (
-            <SubfolderItemRow
-              key={child.id}
-              child={child}
-              filter={filter}
-              onFilterChange={onFilterChange}
-              onViewChange={onViewChange}
-              onRenameFolder={onRenameFolder}
-              onRecolorFolder={onRecolorFolder}
-              onDuplicateFolder={onDuplicateFolder}
-              onDeleteFolder={onDeleteFolder}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
